@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Enterprise PKI Manager - FIntraX Congo</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1e3a8a',
+            secondary: '#3b82f6',
+            accent: '#ef4444',
+            light: '#f8fafc',
+            dark: '#1e293b',
+            success: '#10b981',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            info: '#06b6d4'
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <!-- Configuration de l'application -->
+  <script>
+    // Configuration de l'application PKI
+    window.APP_CONFIG = {
+      api: {
+        base: '', // Utiliser des chemins relatifs
+        endpoints: {
+          certificates: '/api/pki/certificates',
+          hsmStatus: '/api/pkcs11/status',
+          signatures: '/api/pki/signatures',
+          users: '/api/pki/users',
+          crl: '/api/pki/crl',
+          audit: '/api/pki/audit',
+          dashboard: '/api/pki/dashboard/stats',
+          generateCertificate: '/api/pki/certificates/generate',
+          revokeCertificate: '/api/pki/certificates/{id}/revoke',
+          publishCRL: '/api/pki/crl/publish',
+          signDocument: '/api/pki/documents/sign',
+          verifyDocument: '/api/pki/documents/verify'
+        },
+        timeout: 30000,
+        retryAttempts: 3
+      },
+      features: {
+        hsm: true,
+        signing: true,
+        timestamping: true,
+        userManagement: true,
+        auditLogging: true
+      },
+      ui: {
+        autoRefresh: true,
+        refreshInterval: 30000,
+        maxFileSize: 10 * 1024 * 1024 // 10MB
+      }
+    };
+
+    // Configuration des messages d'erreur
+    window.ERROR_MESSAGES = {
+      NETWORK_ERROR: 'Erreur de connexion au serveur. Vérifiez votre connexion internet.',
+      SERVER_ERROR: 'Erreur du serveur. Veuillez réessayer plus tard.',
+      HSM_DISCONNECTED: 'HSM déconnecté. Vérifiez la connexion matérielle.',
+      INVALID_CERTIFICATE: 'Certificat invalide ou corrompu.',
+      FILE_TOO_LARGE: 'Fichier trop volumineux. Taille maximale: 10MB.',
+      UNSUPPORTED_FILE_TYPE: 'Type de fichier non supporté.'
+    };
+
+    // Configuration des types de certificats
+    window.CERTIFICATE_TYPES = {
+      user: { label: 'Utilisateur', color: 'blue' },
+      server: { label: 'Serveur', color: 'green' },
+      ca: { label: 'Autorité de Certification', color: 'purple' },
+      code: { label: 'Signature de code', color: 'orange' },
+      email: { label: 'E-mail', color: 'red' }
+    };
+
+    // Configuration des statuts de certificats
+    window.CERTIFICATE_STATUS = {
+      valid: { label: 'Valide', color: 'green', icon: 'fa-check-circle' },
+      expired: { label: 'Expiré', color: 'red', icon: 'fa-exclamation-triangle' },
+      revoked: { label: 'Révoqué', color: 'yellow', icon: 'fa-ban' },
+      pending: { label: 'En attente', color: 'blue', icon: 'fa-clock' }
+    };
+  </script>
+
+  <style>
+    :root {
+      --sidebar-width: 280px;
+      --header-height: 80px;
+      --transition-speed: 0.3s;
+    }
+    
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      font-family: 'Inter', sans-serif;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px }
+    ::-webkit-scrollbar-track { background: #1e293b; border-radius: 10px }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b }
+
+    @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+    .animate-fade-in { animation: fadeIn .3s ease-in-out }
+
+    .hover-row:hover { background: #f1f5f9; cursor: pointer }
+    .badge { 
+      border-radius: 9999px; 
+      padding: 0.25rem 0.6rem; 
+      font-weight: 600; 
+      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    
+    .active-link { 
+      background: #3b82f6 !important; 
+      color: white !important;
+    }
+    
+    .active-tab { color: #3b82f6; border-bottom: 2px solid #3b82f6 }
+
+    .cert-status-valid { background: #d1fae5; color: #065f46; border-left: 4px solid #10b981 }
+    .cert-status-expired { background: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444 }
+    .cert-status-revoked { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b }
+
+    .log-entry { margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.875rem }
+    .log-time { color: #6b7280 }
+    .log-info { color: #3b82f6 }
+    .log-success { color: #10b981 }
+    .log-warning { color: #f59e0b }
+    .log-error { color: #ef4444 }
+
+    .signature-valid { color: #10b981 }
+    .signature-invalid { color: #ef4444 }
+
+    .modal-overlay { 
+      background: rgba(0, 0, 0, 0.7); 
+      backdrop-filter: blur(4px);
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    
+    /* Full screen layout */
+    .app-container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+    
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #1e293b;
+      color: white;
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      transition: transform var(--transition-speed);
+      z-index: 50;
+      overflow-y: auto;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    }
+    
+    .main-content {
+      flex: 1;
+      margin-left: var(--sidebar-width);
+      height: 100vh;
+      overflow-y: auto;
+      background: #f8fafc;
+      transition: margin-left var(--transition-speed);
+    }
+    
+    .header {
+      height: var(--header-height);
+      background: white;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    
+    .content-area {
+      padding: 2rem;
+      min-height: calc(100vh - var(--header-height));
+    }
+    
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s ease;
+    }
+    
+    .card:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      transform: translateY(-2px);
+    }
+    
+    .stat-card {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    
+    .sidebar.collapsed {
+      transform: translateX(calc(-1 * var(--sidebar-width)));
+    }
+    
+    .sidebar.collapsed + .main-content {
+      margin-left: 0;
+    }
+    
+    .mobile-menu-btn {
+      display: none;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+    
+    @media (max-width: 1024px) {
+      .sidebar {
+        transform: translateX(calc(-1 * var(--sidebar-width)));
+      }
+      
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      
+      .main-content {
+        margin-left: 0;
+      }
+      
+      .mobile-menu-btn {
+        display: block;
+      }
+    }
+    
+    /* Tab styling */
+    .tabs-container {
+      display: flex;
+      border-bottom: 2px solid #e2e8f0;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    
+    .tab {
+      padding: 1rem 1.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .tab.active {
+      color: #3b82f6;
+      border-bottom-color: #3b82f6;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* Table styling */
+    .table-container {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    th {
+      background: #f8fafc;
+      padding: 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: #475569;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    td {
+      padding: 1rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    tr:last-child td {
+      border-bottom: none;
+    }
+    
+    /* Button styling */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      gap: 0.5rem;
+    }
+    
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+    
+    .btn-secondary {
+      background: #f1f5f9;
+      color: #475569;
+    }
+    
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+    
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+    
+    .btn-success:hover {
+      background: #059669;
+    }
+    
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+    
+    /* Toast notifications */
+    .toast-container {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .toast {
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 300px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      animation: slideIn 0.3s ease-out;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .toast.success { background: #10b981; }
+    .toast.error { background: #ef4444; }
+    .toast.warning { background: #f59e0b; }
+    .toast.info { background: #3b82f6; }
+    
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    /* Form elements */
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: #374151;
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+    
+    .form-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Progress bar */
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: #3b82f6;
+      transition: width 0.3s ease;
+    }
+    
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 2px solid transparent;
+      border-top: 2px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* File drop zone */
+    .file-drop-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .file-drop-zone:hover {
+      border-color: #3b82f6;
+      background: #f0f7ff;
+    }
+    
+    .file-drop-zone.active {
+      border-color: #3b82f6;
+      background: #f0f7ff;
+    }
+    
+    /* Modal styling */
+    .modal {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: between;
+      align-items: center;
+    }
+    
+    .modal-body {
+      padding: 1.5rem;
+    }
+    
+    .modal-footer {
+      padding: 1.5rem;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    /* Styles pour les boutons icônes */
+    .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem;
+      border-radius: 6px;
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .btn-icon:hover {
+      background: rgba(0, 0, 0, 0.05);
+      transform: scale(1.05);
+    }
+
+    .btn-icon:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* États de chargement */
+    .loading-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      color: #6b7280;
+    }
+
+    .loading-state i {
+      margin-right: 0.5rem;
+    }
+
+    /* États vides */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #6b7280;
+    }
+
+    .empty-state i {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    /* Responsivité améliorée */
+    @media (max-width: 768px) {
+      .table-container {
+        font-size: 0.875rem;
+      }
+      
+      .btn-icon {
+        padding: 0.375rem;
+      }
+      
+      .card {
+        margin: 0.5rem;
+      }
+      
+      .content-area {
+        padding: 1rem;
+      }
+      
+      .header {
+        padding: 0 1rem;
+      }
+    }
+
+    /* Accessibilité */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    button:focus-visible,
+    a:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+
+    /* Text overflow */
+    .text-ellipsis {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-8">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+              <i class="fas fa-shield-alt text-white"></i>
+            </div>
+            <div>
+              <h1 class="font-bold text-lg">PKI Manager</h1>
+              <p class="text-sm text-slate-300">FIntraX Congo</p>
+            </div>
+          </div>
+          <button id="sidebarToggle" class="text-slate-400 hover:text-white">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <nav class="space-y-2">
+          <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-white bg-blue-600 active-link" data-tab="dashboard">
+            <i class="fas fa-tachometer-alt w-5"></i>
+            <span>Tableau de bord</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700" data-tab="certificates">
+            <i class="fas fa-certificate w-5"></i>
+            <span>Certificats</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700" data-tab="signing">
+            <i class="fas fa-signature w-5"></i>
+            <span>Signature</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700" data-tab="users">
+            <i class="fas fa-users w-5"></i>
+            <span>Utilisateurs</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700" data-tab="tsa">
+            <i class="fas fa-clock w-5"></i>
+            <span>Horodatage</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700" data-tab="crl">
+            <i class="fas fa-ban w-5"></i>
+            <span>Révocation</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700" data-tab="audit">
+            <i class="fas fa-clipboard-list w-5"></i>
+            <span>Audit</span>
+          </a>
+          <a href="#" class="flex items-center gap-3 p-3 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700" data-tab="settings">
+            <i class="fas fa-cog w-5"></i>
+            <span>Paramètres</span>
+          </a>
+        </nav>
+        
+        <div class="mt-8 p-4 bg-slate-800 rounded-lg">
+          <h3 class="font-semibold text-white mb-2">Statut HSM</h3>
+          <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-red-500" id="hsmStatusIndicator"></div>
+            <div>
+              <p class="text-sm font-medium text-white" id="hsmStatusText">Déconnecté</p>
+              <p class="text-xs text-slate-300" id="hsmStatusDetail">Aucun HSM détecté</p>
+            </div>
+          </div>
+          <button class="btn btn-secondary w-full mt-3" id="refreshHSM">
+            <i class="fas fa-sync-alt"></i>
+            Actualiser
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="header">
+        <div class="flex items-center gap-4">
+          <button class="mobile-menu-btn" id="mobileMenuToggle">
+            <i class="fas fa-bars"></i>
+          </button>
+          <h2 class="text-xl font-bold text-slate-800" id="pageTitle">Tableau de Bord PKI</h2>
+        </div>
+        
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <i class="fas fa-user text-blue-600"></i>
+            </div>
+            <div class="text-right">
+              <p class="font-medium text-slate-800">Administrateur</p>
+              <p class="text-sm text-slate-600">EcoBank RDC</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content Area -->
+      <div class="content-area">
+        <!-- Dashboard Tab -->
+        <div class="tab-content active" id="dashboard">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-800">Tableau de Bord PKI</h1>
+              <p class="text-slate-600">Aperçu complet de votre infrastructure à clé publique</p>
+            </div>
+            <button class="btn btn-secondary" id="refreshDashboard">
+              <i class="fas fa-sync-alt"></i>
+              Actualiser
+            </button>
+          </div>
+
+          <!-- Stats Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card">
+              <div>
+                <h3 class="text-lg font-semibold">Certificats Actifs</h3>
+                <p class="text-3xl font-bold mt-2" id="activeCertsCount">0</p>
+              </div>
+              <div class="flex justify-between items-center mt-4">
+                <span class="text-blue-100" id="certExpiryStats">0 expirent bientôt</span>
+                <i class="fas fa-certificate text-2xl text-blue-200"></i>
+              </div>
+            </div>
+            
+            <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #047857 100%);">
+              <div>
+                <h3 class="text-lg font-semibold">Signatures Ce Mois</h3>
+                <p class="text-3xl font-bold mt-2" id="signaturesCount">0</p>
+              </div>
+              <div class="flex justify-between items-center mt-4">
+                <span class="text-green-100" id="signaturesTrend">0 aujourd'hui</span>
+                <i class="fas fa-signature text-2xl text-green-200"></i>
+              </div>
+            </div>
+            
+            <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+              <div>
+                <h3 class="text-lg font-semibold">Horodatages</h3>
+                <p class="text-3xl font-bold mt-2" id="timestampsCount">0</p>
+              </div>
+              <div class="flex justify-between items-center mt-4">
+                <span class="text-amber-100" id="timestampsTrend">0 cette semaine</span>
+                <i class="fas fa-clock text-2xl text-amber-200"></i>
+              </div>
+            </div>
+            
+            <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+              <div>
+                <h3 class="text-lg font-semibold">Statut HSM</h3>
+                <p class="text-3xl font-bold mt-2" id="hsmStatus">Inactif</p>
+              </div>
+              <div class="flex justify-between items-center mt-4">
+                <span class="text-red-100" id="hsmDetails">Vérification...</span>
+                <i class="fas fa-shield-alt text-2xl text-red-200"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Content Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Expiring Certificates -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-bell text-amber-500"></i>
+                Certificats Expirant Bientôt
+              </h3>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Sujet</th>
+                      <th>Expiration</th>
+                      <th class="text-right">Jours</th>
+                    </tr>
+                  </thead>
+                  <tbody id="expiringCertsBody">
+                    <tr>
+                      <td colspan="3" class="text-center py-6 text-slate-400 loading-state">
+                        <i class="fas fa-spinner spinner"></i> Chargement...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-clipboard-list text-purple-500"></i>
+                Journal d'Activité Récente
+              </h3>
+              <div class="h-64 overflow-y-auto">
+                <div class="space-y-3" id="recentActivity">
+                  <div class="loading-state">
+                    <i class="fas fa-spinner spinner"></i> Chargement des activités...
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Certificates Tab -->
+        <div class="tab-content" id="certificates">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-800">Gestion des Certificats</h1>
+              <p class="text-slate-600">Gérez le cycle de vie complet des certificats numériques de votre organisation</p>
+            </div>
+            <div class="flex gap-3">
+              <button class="btn btn-secondary" id="btnImportCert">
+                <i class="fas fa-file-import"></i>
+                Importer
+              </button>
+              <button class="btn btn-primary" id="btnGenerateCert">
+                <i class="fas fa-plus"></i>
+                Nouveau Certificat
+              </button>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="card p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="form-group">
+                <label class="form-label">Filtrer par statut</label>
+                <select class="form-input" id="certFilterStatus">
+                  <option value="all">Tous les statuts</option>
+                  <option value="valid">Valides</option>
+                  <option value="expired">Expirés</option>
+                  <option value="revoked">Révoqués</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Filtrer par type</label>
+                <select class="form-input" id="certFilterType">
+                  <option value="all">Tous les types</option>
+                  <option value="user">Utilisateur</option>
+                  <option value="server">Serveur</option>
+                  <option value="ca">Autorité de Certification</option>
+                  <option value="code">Signature de code</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Rechercher</label>
+                <input type="text" class="form-input" id="certSearch" placeholder="Sujet, émetteur, série...">
+              </div>
+            </div>
+          </div>
+
+          <!-- Certificates Table -->
+          <div class="card">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="p-4 font-semibold text-slate-600">Sujet</th>
+                    <th class="p-4 font-semibold text-slate-600">Émetteur</th>
+                    <th class="p-4 font-semibold text-slate-600">Expiration</th>
+                    <th class="p-4 font-semibold text-slate-600">Type</th>
+                    <th class="p-4 font-semibold text-slate-600">Statut</th>
+                    <th class="p-4 font-semibold text-slate-600 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="certificatesTableBody">
+                  <tr>
+                    <td colspan="6" class="text-center p-6 text-slate-400 loading-state">
+                      <i class="fas fa-spinner spinner mr-2"></i> Chargement des certificats...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Signing Tab -->
+        <div class="tab-content" id="signing">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-800">Signature et Horodatage</h1>
+              <p class="text-slate-600">Signez numériquement des documents et appliquez des horodatages certifiés</p>
+            </div>
+            <div class="flex gap-3">
+              <button class="btn btn-secondary" id="btnVerifyDocument">
+                <i class="fas fa-check-circle"></i>
+                Vérifier un document
+              </button>
+              <button class="btn btn-primary" id="btnBatchSign">
+                <i class="fas fa-layer-group"></i>
+                Signature par lot
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Document Signing Section -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-signature text-blue-500"></i>
+                Document à Signer
+              </h3>
+              
+              <div class="mb-6">
+                <label class="form-label">Sélectionnez un document</label>
+                <div class="file-drop-zone" id="documentDropZone">
+                  <i class="fas fa-cloud-upload-alt text-4xl text-slate-400 mb-2"></i>
+                  <p class="text-slate-600 mb-1">Glissez-déposez un fichier ici ou <span class="text-blue-600 font-medium cursor-pointer" id="browseLink">cliquez pour parcourir</span></p>
+                  <p class="text-xs text-slate-500">Formats supportés: PDF, DOC, DOCX, XML, TXT (Max: 10MB)</p>
+                  <input type="file" id="documentInput" class="hidden" accept=".pdf,.doc,.docx,.xml,.txt,.odt">
+                </div>
+                <div id="selectedDocument" class="hidden mt-3">
+                  <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div class="flex items-center gap-3">
+                      <i class="fas fa-file text-blue-500 text-xl"></i>
+                      <div>
+                        <div id="documentName" class="font-medium">document.pdf</div>
+                        <div id="documentSize" class="text-sm text-slate-500">0 KB</div>
+                      </div>
+                    </div>
+                    <button id="removeDocument" class="text-red-500 hover:text-red-700 p-1 rounded">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-6">
+                <h4 class="form-label mb-3">Configuration de la signature</h4>
+                
+                <div class="form-group mb-4">
+                  <label class="form-label">Certificat de signature</label>
+                  <select class="form-input" id="signingCertSelect">
+                    <option value="">-- Sélectionner un certificat --</option>
+                  </select>
+                  <div class="text-xs text-slate-500 mt-1" id="certificateInfo">Aucun certificat sélectionné</div>
+                </div>
+
+                <div class="form-group mb-4">
+                  <label class="form-label">PIN de sécurité HSM</label>
+                  <div class="relative">
+                    <input type="password" class="form-input pr-10" id="signingPin" placeholder="Entrez votre PIN HSM" required>
+                    <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600" id="togglePinVisibility">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                  </div>
+                  <div class="text-xs text-slate-500 mt-1">PIN requis pour accéder à la clé privée du HSM</div>
+                </div>
+              </div>
+
+              <div class="mb-6">
+                <h4 class="form-label mb-3">Options avancées</h4>
+                
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div>
+                      <label class="font-medium">Horodatage TSA</label>
+                      <p class="text-xs text-slate-500">Ajouter un horodatage certifié au document</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="includeTimestamp" class="sr-only peer" checked>
+                      <div class="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div>
+                      <label class="font-medium">Signature visible (PDF)</label>
+                      <p class="text-xs text-slate-500">Afficher la signature graphiquement sur les PDF</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="visibleSignature" class="sr-only peer">
+                      <div class="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div>
+                      <label class="font-medium">Signature avancée PAdES</label>
+                      <p class="text-xs text-slate-500">Utiliser le format PAdES pour les PDF (conforme eIDAS)</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="padesSignature" class="sr-only peer">
+                      <div class="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-4">
+                <div class="flex items-start">
+                  <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2"></i>
+                  <div class="text-sm text-blue-700">
+                    <p class="font-medium">Vérifiez les informations avant de signer</p>
+                    <p class="mt-1">Assurez-vous que le certificat sélectionné est approprié pour le type de document et que votre HSM est connecté.</p>
+                  </div>
+                </div>
+              </div>
+
+              <button class="btn btn-primary w-full py-3" id="btnSignDocument" disabled>
+                <i class="fas fa-signature mr-2"></i>
+                Signer le Document
+              </button>
+            </div>
+
+            <!-- Signatures History & Verification -->
+            <div class="space-y-6">
+              <!-- Quick Verification -->
+              <div class="card p-6">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <i class="fas fa-check-circle text-green-500"></i>
+                  Vérification Rapide
+                </h3>
+                
+                <div class="mb-4">
+                  <label class="form-label">Document à vérifier</label>
+                  <div class="flex gap-2">
+                    <input type="file" class="form-input flex-1" id="verifyDocumentInput" accept=".pdf,.p7s,.xml">
+                    <button class="btn btn-secondary" id="btnQuickVerify" disabled>
+                      <i class="fas fa-check"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div id="verificationResult" class="hidden">
+                  <div class="p-3 rounded-lg border" id="verificationStatus">
+                    <!-- Result will be inserted here -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Signatures History -->
+              <div class="card p-6">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <i class="fas fa-history text-purple-500"></i>
+                  Historique des Signatures Récentes
+                </h3>
+                
+                <div class="flex justify-between items-center mb-4">
+                  <div class="text-sm text-slate-600" id="signaturesCountText">0 signatures trouvées</div>
+                  <button class="btn btn-secondary btn-sm" id="btnRefreshSignatures">
+                    <i class="fas fa-sync-alt"></i>
+                  </button>
+                </div>
+
+                <div class="table-container max-h-96 overflow-y-auto">
+                  <table>
+                    <thead class="sticky top-0 bg-slate-50">
+                      <tr>
+                        <th class="p-3 font-semibold text-sm">Document</th>
+                        <th class="p-3 font-semibold text-sm">Signé le</th>
+                        <th class="p-3 font-semibold text-sm text-center">Statut</th>
+                        <th class="p-3 font-semibold text-sm text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="signaturesTableBody">
+                      <tr>
+                        <td colspan="4" class="text-center p-6 text-slate-400 loading-state">
+                          <i class="fas fa-spinner spinner mr-2"></i> Chargement de l'historique...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div class="tab-content" id="users">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-800">Gestion des Utilisateurs</h1>
+              <p class="text-slate-600">Gérez les utilisateurs et leurs certificats d'entreprise associés</p>
+            </div>
+            <div class="flex gap-3">
+              <button class="btn btn-primary" id="btnAddUser">
+                <i class="fas fa-user-plus"></i>
+                Ajouter un Utilisateur
+              </button>
+            </div>
+          </div>
+
+          <!-- Users Table -->
+          <div class="card">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Utilisateur</th>
+                    <th>Email</th>
+                    <th>Rôle</th>
+                    <th>Certificats</th>
+                    <th>Statut</th>
+                    <th class="text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <tr>
+                    <td colspan="6" class="text-center py-6 text-slate-400 loading-state">
+                      <i class="fas fa-spinner spinner"></i> Chargement des utilisateurs...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TSA Tab -->
+        <div class="tab-content" id="tsa">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-800">Autorité d'Horodatage (TSA)</h1>
+              <p class="text-slate-600">Configurez et gérez les services d'horodatage certifié</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- TSA Configuration -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4">Configuration TSA</h3>
+              
+              <div class="space-y-4">
+                <div class="form-group">
+                  <label class="form-label">URL du service TSA</label>
+                  <input type="text" class="form-input" id="tsaUrl" value="https://tsa.fintrax.cd/timestamp">
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Certificat TSA</label>
+                  <select class="form-input" id="tsaCert">
+                    <option value="">-- Sélectionner un certificat --</option>
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Politique d'horodatage</label>
+                  <select class="form-input" id="tsaPolicy">
+                    <option value="1.3.6.1.4.1.13762.3">Politique FIntraX Congo</option>
+                    <option value="1.3.6.1.4.1.13762.3.1">Politique Banque Centrale</option>
+                    <option value="1.3.6.1.4.1.13762.3.2">Politique eIDAS</option>
+                  </select>
+                </div>
+                
+                <div class="flex gap-2">
+                  <button class="btn btn-warning" id="btnTestTsa">
+                    Tester la connexion
+                  </button>
+                  <button class="btn btn-primary ml-auto" id="btnSaveTsa">
+                    Enregistrer
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- TSA Statistics -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4">Statistiques d'Horodatage</h3>
+              
+              <div class="space-y-4 mb-6">
+                <div class="flex justify-between items-center">
+                  <span>Horodatages aujourd'hui</span>
+                  <span class="font-semibold" id="tsaToday">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>Horodatages ce mois</span>
+                  <span class="font-semibold" id="tsaMonth">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>Dernier horodatage</span>
+                  <span class="font-semibold" id="tsaLast">--:--</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>Statut du service</span>
+                  <span class="font-semibold text-green-600" id="tsaStatus">Actif</span>
+                </div>
+              </div>
+
+              <div>
+                <h4 class="form-label mb-2">Journal des horodatages</h4>
+                <div class="bg-slate-900 text-green-300 p-3 rounded-lg h-40 overflow-y-auto font-mono text-sm">
+                  <div id="tsaLog">En attente d'activité...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CRL Tab -->
+        <div class="tab-content" id="crl">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-800">Listes de Révocation de Certificats (CRL)</h1>
+              <p class="text-slate-600">Gérez la révocation des certificats et publiez les listes de révocation</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- Current CRL -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4">CRL Actuelle</h3>
+              <div class="space-y-2 mb-4">
+                <div class="flex justify-between">
+                  <span>Dernière mise à jour</span>
+                  <span id="crlLastUpdate">--</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Prochaine mise à jour</span>
+                  <span id="crlNextUpdate">--</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Certificats révoqués</span>
+                  <span id="crlRevokedCount">0</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-primary flex-1" id="btnPublishCrl">
+                  Publier CRL
+                </button>
+                <button class="btn btn-secondary flex-1" id="btnDownloadCrl">
+                  Télécharger
+                </button>
+              </div>
+            </div>
+
+            <!-- Revoked Certificates -->
+            <div class="card p-6 lg:col-span-2">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4">Certificats Révoqués</h3>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Numéro de série</th>
+                      <th>Sujet</th>
+                      <th>Date de révocation</th>
+                      <th>Raison</th>
+                    </tr>
+                  </thead>
+                  <tbody id="crlTableBody">
+                    <tr>
+                      <td colspan="4" class="text-center p-4 text-slate-500 loading-state">
+                        <i class="fas fa-spinner spinner"></i> Chargement de la CRL...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Revoke Certificate -->
+          <div class="card p-6">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Révoquer un Certificat</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div class="form-group">
+                <label class="form-label">Certificat à révoquer</label>
+                <select class="form-input" id="certToRevoke">
+                  <option value="">-- Sélectionner un certificat --</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Raison de la révocation</label>
+                <select class="form-input" id="revocationReason">
+                  <option value="unspecified">Non spécifiée</option>
+                  <option value="keyCompromise">Compromission de clé</option>
+                  <option value="cACompromise">Compromission de l'AC</option>
+                  <option value="affiliationChanged">Changement d'affiliation</option>
+                  <option value="superseded">Remplacé</option>
+                  <option value="cessationOfOperation">Cessation d'opération</option>
+                  <option value="certificateHold">Suspension de certificat</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-danger" id="btnRevokeCert">
+              Révoquer le Certificat
+            </button>
+          </div>
+        </div>
+
+        <!-- Audit Tab -->
+        <div class="tab-content" id="audit">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-800">Journal d'Audit</h1>
+              <p class="text-slate-600">Consultez l'historique complet des activités PKI</p>
+            </div>
+          </div>
+
+          <!-- Audit Filters -->
+          <div class="card p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div class="form-group">
+                <label class="form-label">Période</label>
+                <select class="form-input" id="auditPeriod">
+                  <option value="today">Aujourd'hui</option>
+                  <option value="week" selected>Cette semaine</option>
+                  <option value="month">Ce mois</option>
+                  <option value="year">Cette année</option>
+                  <option value="custom">Personnalisée</option>
+                </select>
+              </div>
+              
+              <div class="form-group hidden" id="customDateRange">
+                <label class="form-label">Du</label>
+                <input type="date" class="form-input" id="auditStartDate">
+                <label class="form-label mt-2">Au</label>
+                <input type="date" class="form-input" id="auditEndDate">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Type d'événement</label>
+                <select class="form-input" id="auditEventType">
+                  <option value="all">Tous les événements</option>
+                  <option value="certificate">Certificats</option>
+                  <option value="signature">Signatures</option>
+                  <option value="timestamp">Horodatages</option>
+                  <option value="user">Utilisateurs</option>
+                  <option value="security">Sécurité</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Rechercher</label>
+                <input type="text" class="form-input" id="auditSearch" placeholder="Utilisateur, action, détails...">
+              </div>
+            </div>
+          </div>
+
+          <!-- Audit Table -->
+          <div class="card">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date/Heure</th>
+                    <th>Utilisateur</th>
+                    <th>Action</th>
+                    <th>Détails</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                  <tr>
+                    <td colspan="5" class="text-center p-6 text-slate-500 loading-state">
+                      <i class="fas fa-spinner spinner"></i> Chargement du journal...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Audit Actions -->
+          <div class="flex justify-between items-center mt-4">
+            <div class="text-sm text-slate-600" id="auditSummary">Affichage de 0 événements</div>
+            <div class="flex gap-2">
+              <button class="btn btn-secondary" id="btnExportAudit">
+                Exporter le journal
+              </button>
+              <button class="btn btn-danger" id="btnClearAudit">
+                Vider le journal
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div class="tab-content" id="settings">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-800">Paramètres PKI</h1>
+              <p class="text-slate-600">Configurez les paramètres de l'infrastructure à clé publique</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- General Settings -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4">Paramètres Généraux</h3>
+              
+              <div class="space-y-4">
+                <div class="form-group">
+                  <label class="form-label">Nom de l'organisation</label>
+                  <input type="text" class="form-input" id="orgName" value="FIntraX Congo">
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Unité organisationnelle</label>
+                  <input type="text" class="form-input" id="orgUnit" value="Services Financiers">
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Pays</label>
+                  <select class="form-input" id="country">
+                    <option value="CD">République Démocratique du Congo</option>
+                    <option value="FR">France</option>
+                    <option value="US">États-Unis</option>
+                    <option value="BE">Belgique</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Certificate Settings -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4">Paramètres des Certificats</h3>
+              
+              <div class="space-y-4">
+                <div class="form-group">
+                  <label class="form-label">Durée de validité par défaut (jours)</label>
+                  <input type="number" class="form-input" id="certValidity" value="365">
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Algorithme de signature par défaut</label>
+                  <select class="form-input" id="defaultAlgo">
+                    <option value="RSA">RSA 2048</option>
+                    <option value="RSA3072">RSA 3072</option>
+                    <option value="RSA4096">RSA 4096</option>
+                    <option value="ECDSA">ECDSA P-256</option>
+                    <option value="ECDSA384">ECDSA P-384</option>
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Intervalle de publication CRL (jours)</label>
+                  <input type="number" class="form-input" id="crlInterval" value="7">
+                </div>
+              </div>
+            </div>
+
+            <!-- HSM Settings -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4">Paramètres HSM</h3>
+              
+              <div class="space-y-4">
+                <div class="form-group">
+                  <label class="form-label">Type de HSM</label>
+                  <select class="form-input" id="hsmType">
+                    <option value="smartcard">SmartCard-HSM</option>
+                    <option value="nfast">nCipher nShield</option>
+                    <option value="safenet">SafeNet Luna</option>
+                    <option value="utimaco">Utimaco CryptoServer</option>
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">PIN administrateur HSM</label>
+                  <input type="password" class="form-input" id="hsmPin" placeholder="••••••••">
+                </div>
+                
+                <div class="flex items-center">
+                  <input type="checkbox" id="hsmAutoLogin" class="mr-2">
+                  <label for="hsmAutoLogin">Connexion automatique au HSM</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Security Settings -->
+            <div class="card p-6">
+              <h3 class="text-lg font-semibold text-slate-800 mb-4">Paramètres de Sécurité</h3>
+              
+              <div class="space-y-4">
+                <div class="form-group">
+                  <label class="form-label">Exigences de complexité du mot de passe</label>
+                  <select class="form-input" id="passwordPolicy">
+                    <option value="low">Faible (6 caractères)</option>
+                    <option value="medium" selected>Moyenne (8 caractères, chiffres)</option>
+                    <option value="high">Élevée (10 caractères, chiffres, symboles)</option>
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Expiration du mot de passe (jours)</label>
+                  <input type="number" class="form-input" id="passwordExpiry" value="90">
+                </div>
+                
+                <div class="flex items-center">
+                  <input type="checkbox" id="require2fa" class="mr-2">
+                  <label for="require2fa">Exiger l'authentification à deux facteurs</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings Actions -->
+          <div class="flex justify-end gap-3">
+            <button class="btn btn-secondary" id="btnResetSettings">
+              Réinitialiser
+            </button>
+            <button class="btn btn-primary" id="btnSaveSettings">
+              Enregistrer les paramètres
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Modals -->
+  <!-- Certificate Details Modal -->
+  <div class="modal-overlay hidden" id="certDetailsModal">
+    <div class="modal w-full max-w-4xl">
+      <div class="modal-header">
+        <h3 class="text-xl font-bold">Détails du Certificat</h3>
+        <button class="text-slate-500 hover:text-slate-700 close-modal" data-modal="certDetailsModal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="empty-state">
+          <i class="fas fa-info-circle text-4xl"></i>
+          <h3 class="text-lg font-semibold mb-2">Détails du certificat</h3>
+          <p class="text-slate-600">Cette fonctionnalité sera disponible prochainement</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary close-modal" data-modal="certDetailsModal">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress Modal -->
+  <div class="modal-overlay hidden" id="progressModal">
+    <div class="modal w-full max-w-lg">
+      <div class="modal-header">
+        <h3 class="text-xl font-bold text-center" id="progressTitle">Opération en Cours</h3>
+      </div>
+      <div class="modal-body">
+        <div class="bg-slate-900 text-white rounded-lg overflow-hidden shadow-inner h-64 p-4">
+          <div id="progressLog" class="h-full overflow-y-auto font-mono text-sm"></div>
+        </div>
+        <div class="mt-4 flex items-center">
+          <div class="progress-bar">
+            <div id="progressBar" class="progress-fill" style="width: 0%"></div>
+          </div>
+          <span id="progressPercent" class="ml-3 text-sm font-medium">0%</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary w-full hidden" id="closeProgressBtn">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔽🔽🔽 IMPORTANT : APPEL EXTERNE À pki.js 🔽🔽🔽 -->
+  <script src="/assets/js/pki.js"></script>
+</body>
+</html>

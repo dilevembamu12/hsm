@@ -1,0 +1,83 @@
+{
+  "total": 7,
+  "events": [
+    {
+      "id": "7c3cafb4-1403-456f-9432-d05fd0bacb0c",
+      "timestamp": "2025-09-29T17:44:15.237Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arret du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "751fc491-1e14-4545-822a-c6516d28eae5",
+      "timestamp": "2025-09-28T20:32:34.878Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arret du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "b392b135-705b-452e-893b-fd14a901f22f",
+      "timestamp": "2025-09-28T20:05:08.611Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arret du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "ba51979b-4057-437e-b9b4-f6222577a9db",
+      "timestamp": "2025-09-28T19:56:10.850Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arret du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "a59d8dd8-e88f-41b0-908f-4e767589f122",
+      "timestamp": "2025-09-28T19:34:56.939Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arret du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "5f8efc41-5681-453d-8a7f-cd7629041d6f",
+      "timestamp": "2025-09-28T19:21:25.588Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arret du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "f2572314-c221-491b-af1c-2abac62255f1",
+      "timestamp": "2025-09-28T19:14:04.123Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arret du serveur PKI",
+      "severity": "info"
+    }
+  ],
+  "statistics": {
+    "today": 0,
+    "thisWeek": 0,
+    "thisMonth": 0,
+    "bySeverity": {
+      "info": 0,
+      "warning": 0,
+      "error": 0,
+      "critical": 0
+    },
+    "byAction": {
+      "certificate_generated": 0,
+      "certificate_revoked": 0,
+      "user_login": 0,
+      "document_signed": 0,
+      "configuration_changed": 0
+    }
+  },
+  "timestamp": "2025-09-29T17:44:15.237Z",
+  "version": "1.0",
+  "initialized": true,
+  "lastModified": "2025-09-29T17:44:15.237Z"
+}

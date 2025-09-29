@@ -1,0 +1,25 @@
+{
+  "currentCRL": {
+    "issuer": "CN=FIntraX Root CA, O=FIntraX Congo",
+    "lastUpdate": null,
+    "nextUpdate": null,
+    "revokedCertificates": 0,
+    "serial": "CRL-000000"
+  },
+  "revokedCertificates": [],
+  "history": [],
+  "statistics": {
+    "totalRevoked": 0,
+    "revokedThisMonth": 0,
+    "revokedThisYear": 0,
+    "byReason": {
+      "keyCompromise": 0,
+      "affiliationChanged": 0,
+      "unspecified": 0
+    }
+  },
+  "timestamp": "2025-09-28T19:04:12.989Z",
+  "version": "1.0",
+  "initialized": true,
+  "lastModified": "2025-09-28T19:04:12.989Z"
+}

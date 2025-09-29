@@ -1,0 +1,60 @@
+{
+  "general": {
+    "organization": "FIntraX Congo",
+    "organizationalUnit": "Services Financiers",
+    "country": "CD",
+    "locale": "fr-FR",
+    "timezone": "Africa/Kinshasa"
+  },
+  "certificate": {
+    "defaultValidityDays": 365,
+    "defaultAlgorithm": "RSA",
+    "defaultKeySize": 2048,
+    "crlInterval": 7,
+    "autoRenewal": false,
+    "renewalThreshold": 30
+  },
+  "hsm": {
+    "type": "smartcard",
+    "autoLogin": false,
+    "modulePath": "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so",
+    "slot": 0
+  },
+  "security": {
+    "passwordPolicy": "medium",
+    "passwordExpiry": 90,
+    "require2FA": false,
+    "sessionTimeout": 30,
+    "maxLoginAttempts": 5,
+    "auditRetention": 365
+  },
+  "signing": {
+    "defaultTSA": "https://tsa.fintrax.cd/timestamp",
+    "defaultPolicy": "1.3.6.1.4.1.13762.3",
+    "maxFileSize": 10485760,
+    "allowedFormats": [
+      "PDF",
+      "DOC",
+      "DOCX",
+      "XML",
+      "TXT"
+    ],
+    "autoTimestamp": true
+  },
+  "ui": {
+    "theme": "light",
+    "autoRefresh": true,
+    "refreshInterval": 30000,
+    "resultsPerPage": 50
+  },
+  "backup": {
+    "autoBackup": true,
+    "backupInterval": 24,
+    "retentionDays": 30,
+    "lastBackup": null
+  },
+  "timestamp": "2025-09-28T19:04:12.990Z",
+  "version": "1.0",
+  "initialized": true,
+  "lastModified": "2025-09-28T19:04:12.990Z"
+}

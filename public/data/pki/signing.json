@@ -1,0 +1,18 @@
+{
+  "signatures": [],
+  "statistics": {
+    "today": 0,
+    "thisWeek": 0,
+    "thisMonth": 0,
+    "byFormat": {
+      "PAdES": 0,
+      "XAdES": 0,
+      "CAdES": 0
+    }
+  },
+  "pendingSignatures": [],
+  "timestamp": "2025-09-28T19:04:12.988Z",
+  "version": "1.0",
+  "initialized": true,
+  "lastModified": "2025-09-28T19:04:12.988Z"
+}
