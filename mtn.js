@@ -1,4 +1,4 @@
-// server.js - Serveur PKI de Production avec Architecture Récursive
+// server.js - Serveur PKI de Production avec Architecture RÃ©cursive
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -67,7 +67,7 @@ app.use((req, res, next) => {
 
 // Middleware de gestion d'erreurs
 app.use((error, req, res, next) => {
-    console.error('Erreur non gérée:', error);
+    console.error('Erreur non gÃ©rÃ©e:', error);
     res.status(500).json({ 
         ok: false, 
         error: 'Erreur interne du serveur',
@@ -84,7 +84,7 @@ class FileService {
             await fs.mkdir(dirPath, { recursive: true });
             return true;
         } catch (error) {
-            throw new Error(`Impossible de créer le répertoire: ${dirPath}`);
+            throw new Error(`Impossible de crÃ©er le rÃ©pertoire: ${dirPath}`);
         }
     }
 
@@ -107,7 +107,7 @@ class FileService {
             await fs.writeFile(filePath, JSON.stringify(enrichedData, null, 2));
             return enrichedData;
         } catch (error) {
-            throw new Error(`Erreur écriture fichier ${filePath}: ${error.message}`);
+            throw new Error(`Erreur Ã©criture fichier ${filePath}: ${error.message}`);
         }
     }
 
@@ -199,7 +199,7 @@ class PKIService {
                 const keys = forge.pki.rsa.generateKeyPair(keySize);
                 resolve(keys);
             } catch (error) {
-                reject(new Error(`Erreur génération clés: ${error.message}`));
+                reject(new Error(`Erreur gÃ©nÃ©ration clÃ©s: ${error.message}`));
             }
         });
     }
@@ -218,7 +218,7 @@ class PKIService {
             const caPrivateKeyPem = await fs.readFile(CONFIG.pki.ca.privateKey, 'utf8');
             return forge.pki.privateKeyFromPem(caPrivateKeyPem);
         } catch (error) {
-            throw new Error('Impossible de charger la clé privée CA');
+            throw new Error('Impossible de charger la clÃ© privÃ©e CA');
         }
     }
 }
@@ -240,7 +240,7 @@ class AuditService {
             auditData.events.unshift(event);
             auditData.total = auditData.events.length;
             
-            // Garder seulement les 5000 derniers événements
+            // Garder seulement les 5000 derniers Ã©vÃ©nements
             if (auditData.events.length > 5000) {
                 auditData.events = auditData.events.slice(0, 5000);
             }
@@ -256,10 +256,10 @@ class AuditService {
 // ========== INITIALISATION ==========
 
 async function initializeSystem() {
-    console.log('Initialisation du système PKI de production...');
+    console.log('Initialisation du systÃ¨me PKI de production...');
     
     try {
-        // Créer les répertoires
+        // CrÃ©er les rÃ©pertoires
         await Promise.all([
             FileService.ensureDirectory(CONFIG.paths.data),
             FileService.ensureDirectory(CONFIG.paths.certs),
@@ -270,12 +270,12 @@ async function initializeSystem() {
         // Initialiser l'AC racine
         await initializeRootCA();
 
-        // Initialiser les fichiers de données
+        // Initialiser les fichiers de donnÃ©es
         await initializeDataFiles();
 
-        console.log('Système PKI initialisé avec succès');
+        console.log('SystÃ¨me PKI initialisÃ© avec succÃ¨s');
     } catch (error) {
-        console.error('Erreur initialisation système:', error);
+        console.error('Erreur initialisation systÃ¨me:', error);
         process.exit(1);
     }
 }
@@ -284,11 +284,11 @@ async function initializeRootCA() {
     const { privateKey, certificate } = CONFIG.pki.ca;
     
     if (await FileService.fileExists(privateKey) && await FileService.fileExists(certificate)) {
-        console.log('AC racine déjà configurée');
+        console.log('AC racine dÃ©jÃ  configurÃ©e');
         return;
     }
     
-    console.log('Création de l\'AC racine...');
+    console.log('CrÃ©ation de l\'AC racine...');
     
     try {
         const keys = await PKIService.generateKeyPair(4096);
@@ -301,7 +301,7 @@ async function initializeRootCA() {
         cert.validity.notAfter = new Date();
         cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 10);
         
-        // Définir le sujet
+        // DÃ©finir le sujet
         const attrs = [
             { name: 'countryName', value: CONFIG.pki.ca.subject.country },
             { name: 'stateOrProvinceName', value: CONFIG.pki.ca.subject.state },
@@ -339,9 +339,9 @@ async function initializeRootCA() {
         await fs.writeFile(privateKey, forge.pki.privateKeyToPem(keys.privateKey));
         await fs.writeFile(certificate, forge.pki.certificateToPem(cert));
         
-        console.log('AC racine créée avec succès');
+        console.log('AC racine crÃ©Ã©e avec succÃ¨s');
     } catch (error) {
-        throw new Error(`Erreur création AC: ${error.message}`);
+        throw new Error(`Erreur crÃ©ation AC: ${error.message}`);
     }
 }
 
@@ -402,14 +402,14 @@ async function initializeDataFiles() {
         if (!await FileService.fileExists(filePath)) {
             const enrichedData = { ...data, timestamp: new Date().toISOString(), version: '1.0', initialized: true };
             await FileService.writeJSON(filePath, enrichedData);
-            console.log(`Fichier initialisé: ${fileKey}.json`);
+            console.log(`Fichier initialisÃ©: ${fileKey}.json`);
         }
     }
 }
 
-// ========== HANDLERS RÉCURSIFS ==========
+// ========== HANDLERS RÃ‰CURSIFS ==========
 
-// Handler de base pour les opérations CRUD
+// Handler de base pour les opÃ©rations CRUD
 class BaseHandler {
     constructor(dataType) {
         this.dataType = dataType;
@@ -444,14 +444,14 @@ class BaseHandler {
         try {
             const defaultData = await initializeDataFiles[this.dataType]();
             const result = await FileService.writeJSON(this.filePath, defaultData);
-            return { ok: true, message: `${this.dataType} réinitialisé`, ...result };
+            return { ok: true, message: `${this.dataType} rÃ©initialisÃ©`, ...result };
         } catch (error) {
             throw error;
         }
     }
 }
 
-// Handler spécialisé pour les certificats
+// Handler spÃ©cialisÃ© pour les certificats
 class CertificateHandler extends BaseHandler {
     constructor() {
         super('certificates');
@@ -465,13 +465,13 @@ class CertificateHandler extends BaseHandler {
                 throw new Error('Le sujet est requis');
             }
 
-            // Générer la paire de clés
+            // GÃ©nÃ©rer la paire de clÃ©s
             const keys = await PKIService.generateKeyPair(keySize || CONFIG.pki.default.keySize);
             
             // Parser le sujet
             const subjectAttrs = PKIService.parseSubject(subject, email);
             
-            // Créer le certificat
+            // CrÃ©er le certificat
             const cert = forge.pki.createCertificate();
             cert.publicKey = keys.publicKey;
             cert.serialNumber = PKIService.generateSerialNumber();
@@ -479,12 +479,12 @@ class CertificateHandler extends BaseHandler {
             cert.validity.notAfter = new Date();
             cert.validity.notAfter.setDate(cert.validity.notAfter.getDate() + (validityDays || CONFIG.pki.default.validityDays));
             
-            // Définir le sujet et l'émetteur
+            // DÃ©finir le sujet et l'Ã©metteur
             cert.setSubject(subjectAttrs);
             const caCert = await PKIService.loadCACertificate();
             cert.setIssuer(caCert.subject.attributes);
             
-            // Définir les extensions
+            // DÃ©finir les extensions
             const extensions = PKIService.getCertificateExtensions(type, email);
             cert.setExtensions(extensions);
             
@@ -492,7 +492,7 @@ class CertificateHandler extends BaseHandler {
             const caPrivateKey = await PKIService.loadCAPrivateKey();
             cert.sign(caPrivateKey, forge.md.sha256.create());
             
-            // Générer les PEM
+            // GÃ©nÃ©rer les PEM
             const privateKeyPem = forge.pki.privateKeyToPem(keys.privateKey);
             const certificatePem = forge.pki.certificateToPem(cert);
             
@@ -501,7 +501,7 @@ class CertificateHandler extends BaseHandler {
             md.update(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes());
             const fingerprint = md.digest().toHex().match(/.{2}/g).join(':');
             
-            // Créer l'objet certificat
+            // CrÃ©er l'objet certificat
             const newCert = {
                 id: uuidv4(),
                 subject: subject,
@@ -529,22 +529,22 @@ class CertificateHandler extends BaseHandler {
                 }
             };
 
-            // Sauvegarder dans la base de données
+            // Sauvegarder dans la base de donnÃ©es
             const currentData = await FileService.readJSON(this.filePath);
             currentData.certificates.push(newCert);
             currentData.total = currentData.certificates.length;
             
-            // Mettre à jour les statistiques
+            // Mettre Ã  jour les statistiques
             currentData.filters.status.valid = (currentData.filters.status.valid || 0) + 1;
             currentData.filters.type[type] = (currentData.filters.type[type] || 0) + 1;
             
             await FileService.writeJSON(this.filePath, currentData);
 
-            // Journaliser l'événement
+            // Journaliser l'Ã©vÃ©nement
             await AuditService.logEvent({
                 action: 'certificate_generated',
                 user: 'system',
-                description: `Certificat généré pour ${subject}`,
+                description: `Certificat gÃ©nÃ©rÃ© pour ${subject}`,
                 severity: 'info',
                 details: { certificateId: newCert.id, type: type, serial: newCert.serial }
             });
@@ -552,7 +552,7 @@ class CertificateHandler extends BaseHandler {
             return { ok: true, certificate: newCert };
 
         } catch (error) {
-            throw new Error(`Erreur génération certificat: ${error.message}`);
+            throw new Error(`Erreur gÃ©nÃ©ration certificat: ${error.message}`);
         }
     }
 
@@ -562,32 +562,32 @@ class CertificateHandler extends BaseHandler {
             const certificate = currentData.certificates.find(cert => cert.id === certificateId);
 
             if (!certificate) {
-                throw new Error('Certificat non trouvé');
+                throw new Error('Certificat non trouvÃ©');
             }
 
             if (certificate.status === 'revoked') {
-                throw new Error('Le certificat est déjà révoqué');
+                throw new Error('Le certificat est dÃ©jÃ  rÃ©voquÃ©');
             }
 
-            // Mettre à jour le certificat
+            // Mettre Ã  jour le certificat
             certificate.status = 'revoked';
             certificate.revocationDate = new Date().toISOString();
             certificate.revocationReason = reason;
 
-            // Mettre à jour les statistiques
+            // Mettre Ã  jour les statistiques
             currentData.filters.status.valid = (currentData.filters.status.valid || 0) - 1;
             currentData.filters.status.revoked = (currentData.filters.status.revoked || 0) + 1;
 
             await FileService.writeJSON(this.filePath, currentData);
 
-            // Mettre à jour la CRL
+            // Mettre Ã  jour la CRL
             await this.updateCRL(certificate);
 
-            // Journaliser l'événement
+            // Journaliser l'Ã©vÃ©nement
             await AuditService.logEvent({
                 action: 'certificate_revoked',
                 user: 'system',
-                description: `Certificat révoqué: ${certificate.serial}`,
+                description: `Certificat rÃ©voquÃ©: ${certificate.serial}`,
                 severity: 'warning',
                 details: { certificateId, reason, serial: certificate.serial }
             });
@@ -595,7 +595,7 @@ class CertificateHandler extends BaseHandler {
             return { ok: true, certificate };
 
         } catch (error) {
-            throw new Error(`Erreur révocation certificat: ${error.message}`);
+            throw new Error(`Erreur rÃ©vocation certificat: ${error.message}`);
         }
     }
 
@@ -604,7 +604,7 @@ class CertificateHandler extends BaseHandler {
             const crlHandler = new BaseHandler('crl');
             const crlData = await crlHandler.get();
 
-            // Ajouter à la liste des révoqués
+            // Ajouter Ã  la liste des rÃ©voquÃ©s
             crlData.revokedCertificates.unshift({
                 serialNumber: revokedCertificate.serial,
                 subject: revokedCertificate.subject,
@@ -613,7 +613,7 @@ class CertificateHandler extends BaseHandler {
                 certificateId: revokedCertificate.id
             });
 
-            // Mettre à jour les métadonnées CRL
+            // Mettre Ã  jour les mÃ©tadonnÃ©es CRL
             crlData.currentCRL.revokedCertificates = crlData.revokedCertificates.length;
             crlData.currentCRL.lastUpdate = new Date().toISOString();
             crlData.currentCRL.nextUpdate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 jours
@@ -621,14 +621,14 @@ class CertificateHandler extends BaseHandler {
             await crlHandler.update(crlData);
 
         } catch (error) {
-            console.error('Erreur mise à jour CRL:', error);
+            console.error('Erreur mise Ã  jour CRL:', error);
         }
     }
 }
 
-// ========== ROUTES RÉCURSIVES ==========
+// ========== ROUTES RÃ‰CURSIVES ==========
 
-// Factory pour créer les handlers
+// Factory pour crÃ©er les handlers
 function createHandler(type) {
     const handlers = {
         certificates: new CertificateHandler(),
@@ -677,6 +677,7 @@ app.get('/api/pkcs11/status', async (req, res) => {
     }
 });
 
+/*
 // Route for HID status
 app.get('/api/hid/status', async (req, res) => {
     try {
@@ -690,6 +691,7 @@ app.get('/api/hid/status', async (req, res) => {
         res.status(500).json({ ok: false, error: error.message });
     }
 });
+*/
 
 // Route for PKI dashboard status
 app.get('/api/pki/dashboard/status', async (req, res) => {
@@ -727,7 +729,8 @@ app.get('/api/certificates', async (req, res) => {
 });
 
 // Route pour les statistiques du dashboard (frontend expectation)
-app.get('/api/dashboard/stats', async (req, res) => {
+// CORRECTIF : J'ai ajoutÃ© /pki au chemin pour correspondre Ã  la configuration du frontend.
+app.get('/api/pki/dashboard/stats', async (req, res) => {
     try {
         const handler = createHandler('dashboard');
         const result = await handler.get();
@@ -738,7 +741,7 @@ app.get('/api/dashboard/stats', async (req, res) => {
     }
 });
 
-// Route pour l'activité récente
+// Route pour l'activitÃ© rÃ©cente
 app.get('/api/audit/recent', async (req, res) => {
     try {
         const handler = createHandler('audit');
@@ -751,7 +754,7 @@ app.get('/api/audit/recent', async (req, res) => {
     }
 });
 
-// Route pour les certificats expirant bientôt
+// Route pour les certificats expirant bientÃ´t
 app.get('/api/certificates/expiring-soon', async (req, res) => {
     try {
         const handler = new CertificateHandler();
@@ -774,7 +777,7 @@ app.get('/api/certificates/expiring-soon', async (req, res) => {
     }
 });
 
-// Route pour vérifier la connexion
+// Route pour vÃ©rifier la connexion
 app.get('/api/system/status', async (req, res) => {
     try {
         const status = {
@@ -793,7 +796,7 @@ app.get('/api/system/status', async (req, res) => {
     }
 });
 
-// Route générique pour les données
+// Route gÃ©nÃ©rique pour les donnÃ©es
 app.route('/api/pki/data/:type')
     .get(async (req, res) => {
         try {
@@ -823,7 +826,7 @@ app.route('/api/pki/data/:type')
         }
     });
 
-// Routes spécifiques pour les certificats
+// Routes spÃ©cifiques pour les certificats
 app.post('/api/pki/certificates/generate', async (req, res) => {
     try {
         const handler = new CertificateHandler();
@@ -844,7 +847,7 @@ app.post('/api/pki/certificates/:id/revoke', async (req, res) => {
     }
 });
 
-// Route pour télécharger un certificat
+// Route pour tÃ©lÃ©charger un certificat
 app.get('/api/pki/certificates/:id/download', async (req, res) => {
     try {
         const handler = new CertificateHandler();
@@ -852,7 +855,7 @@ app.get('/api/pki/certificates/:id/download', async (req, res) => {
         const certificate = data.certificates.find(cert => cert.id === req.params.id);
 
         if (!certificate) {
-            return res.status(404).json({ ok: false, error: 'Certificat non trouvé' });
+            return res.status(404).json({ ok: false, error: 'Certificat non trouvÃ©' });
         }
 
         res.setHeader('Content-Type', 'application/x-pem-file');
@@ -864,7 +867,7 @@ app.get('/api/pki/certificates/:id/download', async (req, res) => {
     }
 });
 
-// Statistiques du système
+// Statistiques du systÃ¨me
 app.get('/api/pki/system/stats', async (req, res) => {
     try {
         const stats = {};
@@ -892,7 +895,7 @@ app.get('/api/pki/system/stats', async (req, res) => {
     }
 });
 
-// Route de santé
+// Route de santÃ©
 app.get('/api/health', (req, res) => {
     res.json({
         ok: true,
@@ -920,59 +923,59 @@ app.get('/', (req, res) => {
 // Gestion des vues manquantes
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ ok: false, error: 'Endpoint API non trouvé' });
+        return res.status(404).json({ ok: false, error: 'Endpoint API non trouvÃ©' });
     }
-    res.status(404).send('Page non trouvée');
+    res.status(404).send('Page non trouvÃ©e');
 });
 
 // Configuration EJS
 app.set('view engine', 'ejs');
 app.set('views', CONFIG.paths.views);
 
-// ========== DÉMARRAGE DU SERVEUR ==========
+// ========== DÃ‰MARRAGE DU SERVEUR ==========
 
 async function startServer() {
     try {
         await initializeSystem();
         
         app.listen(PORT, () => {
-            console.log('\nServeur PKI démarré avec succès!');
+            console.log('\nServeur PKI dÃ©marrÃ© avec succÃ¨s!');
             console.log(`Port: ${PORT}`);
             console.log(`URL: http://localhost:${PORT}`);
-            console.log(`Données: ${CONFIG.paths.data}`);
+            console.log(`DonnÃ©es: ${CONFIG.paths.data}`);
             console.log(`Certificats: ${CONFIG.paths.certs}`);
             console.log(`API Health: http://localhost:${PORT}/api/health`);
-            console.log('\nPrêt pour la production!');
+            console.log('\nPrÃªt pour la production!');
         });
 
     } catch (error) {
-        console.error('Impossible de démarrer le serveur:', error);
+        console.error('Impossible de dÃ©marrer le serveur:', error);
         process.exit(1);
     }
 }
 
-// Gestion propre de l'arrêt
+// Gestion propre de l'arrÃªt
 process.on('SIGINT', async () => {
-    console.log('\nArrêt du serveur PKI...');
+    console.log('\nArrÃªt du serveur PKI...');
     await AuditService.logEvent({
         action: 'system_shutdown',
         user: 'system',
-        description: 'Arrêt du serveur PKI',
+        description: 'ArrÃªt du serveur PKI',
         severity: 'info'
     });
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    console.log('\nArrêt du serveur PKI (SIGTERM)...');
+    console.log('\nArrÃªt du serveur PKI (SIGTERM)...');
     await AuditService.logEvent({
         action: 'system_shutdown',
         user: 'system',
-        description: 'Arrêt du serveur PKI (SIGTERM)',
+        description: 'ArrÃªt du serveur PKI (SIGTERM)',
         severity: 'info'
     });
     process.exit(0);
 });
 
-// Démarrer le serveur
+// DÃ©marrer le serveur
 startServer();
