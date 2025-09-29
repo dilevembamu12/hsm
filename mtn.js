@@ -677,7 +677,6 @@ app.get('/api/pkcs11/status', async (req, res) => {
     }
 });
 
-/*
 // Route for HID status
 app.get('/api/hid/status', async (req, res) => {
     try {
@@ -691,7 +690,6 @@ app.get('/api/hid/status', async (req, res) => {
         res.status(500).json({ ok: false, error: error.message });
     }
 });
-*/
 
 // Route for PKI dashboard status
 app.get('/api/pki/dashboard/status', async (req, res) => {
@@ -717,7 +715,8 @@ app.get('/favicon.ico', (req, res) => {
 // ========== FRONTEND API ROUTES ==========
 
 // Route pour les certificats (frontend expectation)
-app.get('/api/certificates', async (req, res) => {
+// CORRECTIF : J'ai ajouté /pki au chemin pour correspondre à la configuration du frontend.
+app.get('/api/pki/certificates', async (req, res) => {
     try {
         const handler = new CertificateHandler();
         const result = await handler.get();

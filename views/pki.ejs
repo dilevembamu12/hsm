@@ -1537,6 +1537,90 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Modals -->
+  <!-- Generate Certificate Modal -->
+  <div class="modal-overlay hidden" id="generateCertModal">
+    <div class="modal w-full max-w-2xl">
+      <div class="modal-header">
+        <h3 class="text-xl font-bold text-slate-800">Générer un Nouveau Certificat</h3>
+        <button class="text-slate-500 hover:text-slate-700 close-modal" data-modal="generateCertModal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <form id="generateCertForm">
+        <div class="modal-body grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Colonne 1 -->
+          <div>
+            <h4 class="font-semibold mb-4 text-slate-600 border-b pb-2">Sujet du Certificat</h4>
+            <div class="form-group">
+              <label for="commonName" class="form-label">Nom Commun (CN)</label>
+              <input type="text" id="commonName" name="commonName" class="form-input" placeholder="ex: www.domaine.com ou Nom Prénom" required>
+            </div>
+            <div class="form-group">
+              <label for="organization" class="form-label">Organisation (O)</label>
+              <input type="text" id="organization" name="organization" class="form-input" placeholder="ex: FIntraX Congo" value="FIntraX Congo">
+            </div>
+            <div class="form-group">
+              <label for="orgUnit" class="form-label">Unité d'Organisation (OU)</label>
+              <input type="text" id="orgUnit" name="orgUnit" class="form-input" placeholder="ex: Département IT" value="PKI Services">
+            </div>
+             <div class="form-group">
+              <label for="email" class="form-label">Adresse E-mail</label>
+              <input type="email" id="email" name="email" class="form-input" placeholder="ex: utilisateur@domaine.com">
+            </div>
+          </div>
+          <!-- Colonne 2 -->
+          <div>
+            <h4 class="font-semibold mb-4 text-slate-600 border-b pb-2">Configuration</h4>
+            <div class="form-group">
+              <label for="certType" class="form-label">Type de Certificat</label>
+              <select id="certType" name="certType" class="form-input">
+                <option value="user" selected>Utilisateur</option>
+                <option value="server">Serveur</option>
+                <option value="email">Signature E-mail</option>
+                <option value="code">Signature de Code</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="validityDays" class="form-label">Période de Validité (jours)</label>
+              <input type="number" id="validityDays" name="validityDays" class="form-input" value="365" required>
+            </div>
+            <div class="form-group">
+              <label for="keySize" class="form-label">Taille de la Clé (bits)</label>
+              <select id="keySize" name="keySize" class="form-input">
+                <option value="2048" selected>2048 bits (Standard)</option>
+                <option value="3072">3072 bits</option>
+                <option value="4096">4096 bits (Élevé)</option>
+              </select>
+            </div>
+             <div class="form-group">
+              <label for="country" class="form-label">Pays (C)</label>
+              <input type="text" id="country" name="country" class="form-input" value="CD" maxlength="2">
+            </div>
+          </div>
+          <div class="md:col-span-2 grid grid-cols-2 gap-4">
+               <div class="form-group">
+                  <label for="locality" class="form-label">Localité (L)</label>
+                  <input type="text" id="locality" name="locality" class="form-input" value="Kinshasa">
+                </div>
+                <div class="form-group">
+                  <label for="state" class="form-label">État/Province (ST)</label>
+                  <input type="text" id="state" name="state" class="form-input" value="Kinshasa">
+                </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary close-modal" data-modal="generateCertModal">
+            Annuler
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-plus mr-2"></i>
+            Générer le Certificat
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Certificate Details Modal -->
   <div class="modal-overlay hidden" id="certDetailsModal">
     <div class="modal w-full max-w-4xl">
