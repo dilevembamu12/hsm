@@ -1,0 +1,56 @@
+pm2 flush
+pm2 delete all
+
+clear
+
+cd /home/okap/app
+pm2 start okap.js --watch
+
+cd /home/fbb-website/app
+pm2 start fbb_website.js
+
+cd /home/gabon
+pm2 start gabon.js
+
+cd /home/gazomac
+pm2 start gazomac.js
+
+cd /home/feba/app
+pm2 start feba.js
+
+cd /home/gouvstore
+pm2 start gouvstore.js
+
+cd /home/fintrax
+pm2 start fintrax.js
+
+cd /home/ezwallet
+sudo pm2 start ezwallet.js
+
+cd /home/zelle/web
+pm2 start zelle.js
+
+cd /home/apiserver
+pm2 start apiserver.js
+
+cd /home/autocheck
+pm2 start autocheck.js
+
+cd /home/zelle/web
+pm2 start zelle.js
+
+
+cd /home/fluvial
+pm2 start fluvial.js
+
+cd /home/camview
+pm2 start camview.js
+
+cd /home/devops
+pm2 start devops.js 
+
+cd /home/pki
+pm2 start mtn.js --watch
+
+pm2 log devops
+

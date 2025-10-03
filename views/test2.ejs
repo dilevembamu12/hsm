@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title><%= (env && env.APP_NAME) ? env.APP_NAME : 'FIntraX' %> — HSM Diagnostic</title>
+
+  <!-- Tailwind (CDN) + Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '<%= (env && env.UI_PRIMARY) ? env.UI_PRIMARY : "#0ea5e9" %>'
+          },
+          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui'] }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root{
+      --header-h: 64px;
+      --footer-h: 54px;
+    }
+    body{ background: #0b1221; color:#f0f4ff; }
+    .card{ background: #101a33; border:1px solid #1f2a44; border-radius: 16px }
+    .pill{ border-radius: 999px; padding: 3px 10px; font-size: 12px }
+    .btn{ @apply px-3 py-2 rounded-xl font-semibold transition; }
+    .btn-brand{ background: var(--tw-brand, #0ea5e9); }
+    .btn:disabled{ opacity:.5; cursor:not-allowed }
+    .kbd{ background:#0d1326; border:1px solid #1f2a44; border-radius:6px; padding:2px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace }
+    .log{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+    .grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px }
+    @media (max-width: 1024px){ .grid-2{ grid-template-columns: 1fr } }
+  </style>
+
+  <script src="/config.js"></script>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="fixed inset-x-0 top-0 h-[var(--header-h)] z-10 bg-[#0d1730] border-b border-[#1f2a44] flex items-center">
+    <div class="max-w-6xl mx-auto w-full px-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-2xl bg-brand/20 grid place-items-center text-brand"><i class="fa-solid fa-shield-halved"></i></div>
+        <h1 class="text-lg font-bold"><%= (env && env.HEADER_TITLE) ? env.HEADER_TITLE : 'FintraX — Plateforme de Certification PKI' %></h1>
+      </div>
+      <div class="text-sm opacity-80"><span id="appName"></span></div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-6xl mx-auto px-4 pt-[calc(var(--header-h)+16px)] pb-[calc(var(--footer-h)+16px)]">
+    <!-- Status row -->
+    <div class="grid-2 mb-4">
+      <section class="card p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold text-brand">Lecteur & Carte</h2>
+          <button id="btnRefreshStatus" class="btn bg-brand hover:opacity-90"><i class="fa-solid fa-rotate"></i> Actualiser</button>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-xl bg-black/20">
+            <div class="text-sm opacity-75 mb-1">Lecteur</div>
+            <div id="readerName" class="font-semibold">—</div>
+            <div id="readerBadge" class="pill inline-block mt-2 bg-red-500/20 border border-red-500/40 text-red-300">déconnecté</div>
+          </div>
+          <div class="p-3 rounded-xl bg-black/20">
+            <div class="text-sm opacity-75 mb-1">Carte</div>
+            <div id="cardInfo" class="font-semibold">—</div>
+            <div id="cardBadge" class="pill inline-block mt-2 bg-red-500/20 border border-red-500/40 text-red-300">absente</div>
+          </div>
+        </div>
+        <div class="mt-4">
+          <button id="btnMechanisms" class="btn bg-[#1e293b] hover:bg-[#22314a]"><i class="fa-solid fa-gear"></i> Mécanismes</button>
+          <button id="btnObjects" class="btn bg-[#1e293b] hover:bg-[#22314a]"><i class="fa-solid fa-list"></i> Objets</button>
+          <button id="btnCardStatus" class="btn bg-[#1e293b] hover:bg-[#22314a]"><i class="fa-solid fa-id-card-clip"></i> Statut SC-HSM</button>
+        </div>
+      </section>
+
+      <section class="card p-4">
+        <h2 class="font-semibold text-brand">Initialisation SmartCard-HSM</h2>
+        <p class="text-sm opacity-80 mt-1">Configure le <b>SO-PIN (BCD)</b> et le <b>User PIN</b> puis initialise la carte.</p>
+
+        <div class="mt-3 grid gap-3">
+          <label class="text-sm">
+            SO-PIN (BCD hex, longueur paire — ex: <span class="kbd">3537363231383830</span> pour 57621880)
+            <input id="soPinBCD" type="text" inputmode="latin" autocomplete="off" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2" placeholder="ex: 3537363231383830"/>
+          </label>
+          <label class="text-sm">
+            User PIN (6–15 chiffres)
+            <input id="userPin" type="password" inputmode="numeric" autocomplete="new-password" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2" placeholder="ex: 123456"/>
+          </label>
+        </div>
+
+        <div class="mt-3 flex items-center gap-2">
+          <button id="btnInitSCHSM" class="btn bg-brand hover:opacity-90"><i class="fa-solid fa-wand-magic-sparkles"></i> Initialiser</button>
+          <button id="btnUnblock" class="btn bg-[#1e293b] hover:bg-[#22314a]"><i class="fa-solid fa-unlock-keyhole"></i> Débloquer PIN via SO-PIN</button>
+        </div>
+
+        <p class="text-xs opacity-60 mt-3">
+          ⚠️ Ne stocke pas les PIN côté serveur. Saisies éphémères, envoyées seulement à l’appel.
+        </p>
+      </section>
+    </div>
+
+    <!-- Keygen & pubkey -->
+    <div class="grid-2 mb-4">
+      <section class="card p-4">
+        <h2 class="font-semibold text-brand">Générer une paire de clés (dans la carte)</h2>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <label class="text-sm">
+            User PIN
+            <input id="kgPin" type="password" inputmode="numeric" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2" placeholder="PIN pour se connecter"/>
+          </label>
+          <label class="text-sm">
+            ID (hex)
+            <input id="kgId" type="text" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2" value="01"/>
+          </label>
+          <label class="text-sm">
+            Label
+            <input id="kgLabel" type="text" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2" value="Sign-Key"/>
+          </label>
+          <label class="text-sm">
+            Type
+            <select id="kgType" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2">
+              <option value="rsa">RSA</option>
+              <option value="ec">EC</option>
+            </select>
+          </label>
+          <label id="rsaBitsWrap" class="text-sm">
+            Taille RSA
+            <select id="kgBits" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2">
+              <option>2048</option>
+              <option>3072</option>
+              <option>4096</option>
+            </select>
+          </label>
+          <label id="ecCurveWrap" class="text-sm hidden">
+            Courbe EC
+            <select id="kgCurve" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2">
+              <option value="prime256v1">prime256v1</option>
+              <option value="secp384r1">secp384r1</option>
+              <option value="secp521r1">secp521r1</option>
+            </select>
+          </label>
+        </div>
+        <div class="mt-3">
+          <button id="btnKeygen" class="btn bg-brand hover:opacity-90"><i class="fa-solid fa-key"></i> Générer</button>
+        </div>
+      </section>
+
+      <section class="card p-4">
+        <h2 class="font-semibold text-brand">Objets & Clé publique</h2>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <label class="text-sm">
+            User PIN (lecture objets si nécessaire)
+            <input id="objPin" type="password" inputmode="numeric" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2" placeholder="Optionnel"/>
+          </label>
+          <label class="text-sm">
+            ID (hex) pour PubKey
+            <input id="pubId" type="text" class="mt-1 w-full rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2" value="01"/>
+          </label>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button id="btnListObjects" class="btn bg-[#1e293b] hover:bg-[#22314a]"><i class="fa-solid fa-list"></i> Lister</button>
+          <button id="btnGetPubKey" class="btn bg-[#1e293b] hover:bg-[#22314a]"><i class="fa-regular fa-file-lines"></i> Exporter PubKey</button>
+        </div>
+        <textarea id="pubOut" class="mt-3 w-full h-28 rounded-xl bg-black/30 border border-[#1f2a44] px-3 py-2 text-xs" placeholder="DER (base64) s’affichera ici..." readonly></textarea>
+      </section>
+    </div>
+
+    <!-- Console -->
+    <section class="card p-4">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-brand">Console</h2>
+        <div class="flex items-center gap-2">
+          <button id="btnQuickDiag" class="btn bg-[#1e293b] hover:bg-[#22314a]"><i class="fa-solid fa-stethoscope"></i> Diag rapide</button>
+          <button id="btnClear" class="btn bg-[#1e293b] hover:bg-[#22314a]"><i class="fa-solid fa-broom"></i> Nettoyer</button>
+        </div>
+      </div>
+      <div id="log" class="log mt-3 p-3 rounded-xl bg-black/30 h-56 overflow-auto"></div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="fixed inset-x-0 bottom-0 h-[var(--footer-h)] bg-[#0d1730] border-t border-[#1f2a44] text-sm flex items-center">
+    <div class="max-w-6xl mx-auto w-full px-4 flex items-center justify-between">
+      <div class="opacity-80">© <%= new Date().getFullYear() %> <%= env && env.COPYRIGHT ? env.COPYRIGHT : 'FintraX' %></div>
+      <div class="opacity-80">PKCS#11 via OpenSC • PC/SC</div>
+    </div>
+  </footer>
+
+  <script>
+    // ---------- helpers ----------
+    const cfg = window.APP_CONFIG || {};
+    const a = cfg.api || {};
+    const pk = (a.pkcs11 || {});
+    const diag = (a.diagnostic || {});
+    const hid = (a.hid || {});
+
+    const $ = (id) => document.getElementById(id);
+    const logBox = $('log');
+
+    function badge(el, ok, yesTxt='OK', noTxt='KO'){
+      el.className = 'pill inline-block mt-2 ' + (ok
+        ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+        : 'bg-red-500/20 border border-red-500/40 text-red-300');
+      el.textContent = ok ? yesTxt : noTxt;
+    }
+    function appendLog(line){
+      const ts = new Date().toISOString().replace('T',' ').replace('Z','');
+      logBox.textContent += `[${ts}] ${line}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    async function jget(url){
+      const r = await fetch(url, { headers: { 'Accept':'application/json' }});
+      if(!r.ok) throw new Error(`GET ${url} → ${r.status}`);
+      return r.json();
+    }
+    async function jpost(url, body){
+      const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}) });
+      let data; try{ data = await r.json(); }catch{ data = { ok:false, error:'Bad JSON' } }
+      if(!r.ok) throw new Error(data && data.error ? data.error : `POST ${url} → ${r.status}`);
+      return data;
+    }
+
+    // ---------- status ----------
+    async function refreshStatus(){
+      try{
+        const st = await jget(hid.status);
+        $('readerName').textContent = st.device?.name || '—';
+        badge($('readerBadge'), !!st.isConnected, st.isConnected ? 'connecté' : 'déconnecté');
+        $('cardInfo').textContent = st.isCardPresent ? 'SmartCard détectée' : '—';
+        badge($('cardBadge'), !!st.isCardPresent, 'présente', 'absente');
+        appendLog(`Lecteur: ${$('readerName').textContent} | Carte: ${st.isCardPresent ? 'présente' : 'absente'}`);
+      }catch(e){
+        appendLog('Erreur statut lecteur: ' + e.message);
+      }
+    }
+
+    // ---------- init SC-HSM ----------
+    async function initSCHSM(){
+      const soPinBCD = ($('soPinBCD').value || '').trim();
+      const userPin = ($('userPin').value || '').trim();
+      if(!/^[0-9a-fA-F]{16,64}$/.test(soPinBCD) || (soPinBCD.length % 2 !== 0)){
+        return appendLog('❌ soPinBCD invalide: hex longueur paire requise (ex: 3537363231383830).');
+      }
+      if(!/^[0-9]{6,15}$/.test(userPin)){
+        return appendLog('❌ userPin invalide: 6–15 chiffres requis.');
+      }
+      try{
+        appendLog('Initialisation SC-HSM…');
+        const r = await jpost(pk.init || pk.scHsmInit || '/api/pkcs11/sc-hsm-init', { soPinBCD, userPin });
+        if(r.ok){
+          appendLog('✅ SC-HSM initialisé.\n' + (r.stdout || ''));
+          await refreshStatus();
+          listObjects(); // show clean state
+        }else{
+          appendLog('❌ Échec initialisation: ' + (r.error || ''));
+        }
+      }catch(e){
+        appendLog('❌ Échec initialisation: ' + e.message);
+      }
+    }
+
+    // ---------- unblock user pin with so-pin ----------
+    async function unblockUserPin(){
+      const soPinBCD = ($('soPinBCD').value || '').trim();
+      const newUserPin = prompt('Nouveau User PIN (6–15 chiffres) ?');
+      if(!newUserPin) return;
+      if(!/^[0-9]{16}$/.test(soPinBCD)) return appendLog('❌ soPinBCD doit être 16 chiffres BCD.');
+      if(!/^[0-9]{6,15}$/.test(newUserPin)) return appendLog('❌ PIN invalide (6–15).');
+      try{
+        const r = await jpost(pk.unblockUserPin, { soPinBCD, newUserPin });
+        appendLog(r.status === 'success' || r.ok ? '✅ User PIN débloqué.' : '⚠️ ' + (r.message || r.error));
+      }catch(e){
+        appendLog('❌ Déblocage PIN: ' + e.message);
+      }
+    }
+
+    // ---------- list objects ----------
+    async function listObjects(){
+      try{
+        const pin = ($('objPin').value || '').trim();
+        const url = pin ? `${pk.objects}?pin=${encodeURIComponent(pin)}` : pk.objects;
+        const r = await jget(url);
+        if(r.ok){
+          appendLog('📦 Objets:\n' + (r.stdout || '(vide)'));
+        }else{
+          appendLog('❌ Objets: ' + (r.error || ''));
+        }
+      }catch(e){
+        appendLog('❌ Objets: ' + e.message);
+      }
+    }
+
+    // ---------- mechanisms / status ----------
+    async function mechanisms(){
+      try{
+        const r = await jget(pk.mechanisms);
+        appendLog('⚙️ Mécanismes supportés:\n' + (r.stdout || ''));
+      }catch(e){
+        appendLog('❌ Mécanismes: ' + e.message);
+      }
+    }
+    async function cardStatus(){
+      try{
+        const r = await jget(pk.status || '/api/pkcs11/sc-hsm-status');
+        appendLog(r.ok ? ('📇 SC-HSM:\n' + r.stdout) : ('❌ Statut: ' + (r.error || '')));
+      }catch(e){
+        appendLog('❌ Statut: ' + e.message);
+      }
+    }
+
+    // ---------- keygen ----------
+    function toggleKeyFields(){
+      const t = $('kgType').value;
+      $('rsaBitsWrap').classList.toggle('hidden', t !== 'rsa');
+      $('ecCurveWrap').classList.toggle('hidden', t !== 'ec');
+    }
+    async function doKeygen(){
+      const pin = ($('kgPin').value || '').trim();
+      const id = ($('kgId').value || '').trim();
+      const label = ($('kgLabel').value || '').trim();
+      const type = $('kgType').value;
+
+      if(!/^[0-9]{6,15}$/.test(pin)) return appendLog('❌ PIN invalide (6–15).');
+      if(!/^[0-9a-fA-F]{2,32}$/.test(id)) return appendLog('❌ ID hex requis (ex: 01).');
+
+      const body = { pin, id, label, type };
+      if(type === 'rsa'){
+        body.bits = Number($('kgBits').value || 2048);
+      }else{
+        body.curve = $('kgCurve').value || 'prime256v1';
+      }
+      try{
+        appendLog('🔐 Génération de clé…');
+        const r = await jpost(pk.keygen, body);
+        if(r.ok){
+          appendLog('✅ Paire de clés générée.\n' + (r.stdout || ''));
+          listObjects();
+        }else{
+          appendLog('❌ Keygen: ' + (r.error || ''));
+        }
+      }catch(e){
+        appendLog('❌ Keygen: ' + e.message);
+      }
+    }
+
+    // ---------- public key ----------
+    async function fetchPubKey(){
+      const id = ($('pubId').value || '').trim();
+      const pin = ($('objPin').value || '').trim() || ($('kgPin').value || '').trim();
+      if(!id) return appendLog('❌ ID requis pour la clé publique.');
+      if(!/^[0-9]{6,15}$/.test(pin)) return appendLog('❌ PIN requis (6–15).');
+
+      try{
+        const url = `${pk.pubkey}?id=${encodeURIComponent(id)}&pin=${encodeURIComponent(pin)}`;
+        const r = await jget(url);
+        if(r.ok && r.der_base64){
+          $('pubOut').value = r.der_base64;
+          appendLog('📤 Clé publique (DER base64) récupérée.');
+        }else{
+          appendLog('⚠️ PubKey: ' + (r.error || 'pas de donnée'));
+        }
+      }catch(e){
+        appendLog('❌ PubKey: ' + e.message);
+      }
+    }
+
+    // ---------- quick diag ----------
+    async function quickDiag(){
+      appendLog('=== Diagnostic rapide ===');
+      await refreshStatus();
+      await mechanisms();
+      await cardStatus();
+      await listObjects();
+      appendLog('=== Fin diagnostic ===');
+    }
+
+    // ---------- wire UI ----------
+    document.addEventListener('DOMContentLoaded', () => {
+      $('appName').textContent = (cfg.appName || 'FIntraX') + ' /diagnostic';
+      $('btnRefreshStatus').onclick = refreshStatus;
+      $('btnMechanisms').onclick = mechanisms;
+      $('btnCardStatus').onclick = cardStatus;
+      $('btnObjects').onclick = listObjects;
+
+      $('btnInitSCHSM').onclick = initSCHSM;
+      $('btnUnblock').onclick = unblockUserPin;
+
+      $('kgType').onchange = toggleKeyFields;
+      toggleKeyFields();
+      $('btnKeygen').onclick = doKeygen;
+
+      $('btnListObjects').onclick = listObjects;
+      $('btnGetPubKey').onclick = fetchPubKey;
+
+      $('btnQuickDiag').onclick = quickDiag;
+      $('btnClear').onclick = () => (logBox.textContent = '');
+
+      // first paint
+      refreshStatus();
+    });
+  </script>
+</body>
+</html> 

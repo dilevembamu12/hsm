@@ -1,6 +1,839 @@
 {
-  "total": 7,
+  "total": 111,
   "events": [
+    {
+      "id": "2fc4c97d378dc8390cf29107",
+      "ts": "2025-10-02T17:04:31.514Z",
+      "type": "signature",
+      "action": "sign",
+      "file": "signed-9715227623ffe2388d025189.txt",
+      "status": "success"
+    },
+    {
+      "id": "20201d0227972bbb6d0a0c41",
+      "ts": "2025-10-02T17:02:44.826Z",
+      "type": "certificate",
+      "action": "generate",
+      "subject": "CN=api.bank.cd, O=BCC, OU=IT, C=CD, L=KINSHASA, emailAddress=emodiembamu@gmail.com",
+      "serial": "52846A2BF887ACA5",
+      "status": "success"
+    },
+    {
+      "id": "3c61fd77-98b7-4fc2-99e5-3bbf780ecaed",
+      "timestamp": "2025-10-02T16:14:59.045Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "700d2b66-37b5-4b31-a0f1-6a0d8d5556ac",
+      "timestamp": "2025-10-02T16:14:52.484Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "84a01101-06cb-4e7b-8ead-21c7b4b1e8bf",
+      "timestamp": "2025-10-02T16:14:21.265Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "c159d25c-5145-4222-840d-7a29b367f969",
+      "timestamp": "2025-10-02T13:19:08.841Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "f281c677-f0b8-46ef-bdd3-6a40aece1026",
+      "timestamp": "2025-10-02T13:18:24.512Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "24a94c01-7a4a-46cd-b2e7-b6e16f573aed",
+      "timestamp": "2025-10-02T13:09:48.802Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "15cb5a55-bbec-4924-8cd5-d59bb132906a",
+      "timestamp": "2025-10-02T13:03:44.171Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "5bea5331-48fe-4c0c-99d1-c018131a0805",
+      "timestamp": "2025-10-02T12:59:45.776Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "0562fe62-a13e-4aa3-9f3e-bc41dd5a2cd0",
+      "timestamp": "2025-10-02T12:54:49.728Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "e687c34f-77e4-47d4-b016-e8a201db90cf",
+      "timestamp": "2025-10-02T12:53:35.632Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "ceeabd34-45e9-4f33-8ec0-d3c3ec75c738",
+      "timestamp": "2025-10-02T12:39:08.128Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "18c4aee0-eea9-4e84-9b7a-4b166daa662d",
+      "timestamp": "2025-10-02T12:33:24.754Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "caebfd96-ead2-44bc-a1ce-86eabee6e7d8",
+      "timestamp": "2025-10-02T12:27:43.392Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "9f307e5b-aeb5-4eb8-a61f-0efe9811c559",
+      "timestamp": "2025-10-02T12:19:02.069Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "7e201131-fc7e-4661-8563-f82fcaa23a67",
+      "timestamp": "2025-10-02T12:05:16.055Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "ebd5f3dc-d5d9-42b4-8b4a-abff968f033e",
+      "timestamp": "2025-10-02T12:04:01.204Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "7c14fcb2-0041-4c6b-89f9-47b79eabbfa7",
+      "timestamp": "2025-10-02T11:45:44.710Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "4925f132-141a-405c-8c97-8d03416d3b94",
+      "timestamp": "2025-10-02T11:36:33.637Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "ce3bd773-4991-4115-bda3-480ac6402eed",
+      "timestamp": "2025-10-02T11:24:07.888Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "dfdba4f7-2c9d-482e-9427-55e053ef0609",
+      "timestamp": "2025-10-02T11:14:40.841Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "24dd2515-e3cd-47d1-935c-a6cb6bcfda92",
+      "timestamp": "2025-10-02T11:14:07.414Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "222e6c70-eb7d-4f0c-9c39-2335f2f13b12",
+      "timestamp": "2025-10-01T16:41:03.112Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "8e2a35e9-1d0c-41d6-b6a5-1b0821dcfaed",
+      "timestamp": "2025-10-01T16:38:25.527Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "5cc04fbc-d998-4b18-9fce-52806d486bb7",
+      "timestamp": "2025-10-01T16:16:17.764Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "9e179915-a111-43b3-b9c1-58195e740731",
+      "timestamp": "2025-10-01T16:06:26.986Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "8329839e-f249-48e8-ad96-7c64b1edc6ed",
+      "timestamp": "2025-10-01T15:53:23.310Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "995f6411-b046-4825-8a07-d5bf913e4884",
+      "timestamp": "2025-10-01T15:51:34.037Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "066294e8-430e-48e9-81a4-e7698f7ccb2e",
+      "timestamp": "2025-10-01T15:51:29.204Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "9bf87185-9219-40fb-a40a-067e1d0543e2",
+      "timestamp": "2025-10-01T15:50:02.334Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "30779e9b-3efe-401c-835e-e34d31c5b775",
+      "timestamp": "2025-10-01T15:49:10.310Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "1db733b7-82c8-426b-9ff9-ec5b7502e2a9",
+      "timestamp": "2025-10-01T15:07:08.532Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "fa7935a0-fd52-43d5-be46-ee1fb8e85c05",
+      "timestamp": "2025-10-01T15:04:59.574Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "01e0f3af-25df-4898-b718-336e472fc1df",
+      "timestamp": "2025-10-01T14:50:28.071Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "db58c43e-2303-4391-b1d4-f39cc14f701e",
+      "timestamp": "2025-10-01T14:50:24.619Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "c746810e-7d65-4fa9-a042-ea99fce9266c",
+      "timestamp": "2025-10-01T14:49:34.710Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "f3b0f5a9-9028-4ef3-a702-0cb4d4a8177c",
+      "timestamp": "2025-10-01T14:49:33.439Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "8d9e1416-9730-4370-ac1b-1c9dcf5afb0b",
+      "timestamp": "2025-10-01T14:49:13.825Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "d2dd3242-092a-4f41-9f60-dc001c3103bd",
+      "timestamp": "2025-10-01T11:48:33.049Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "cf19bd84-3758-4d1f-9b0e-aded38d57cee",
+      "timestamp": "2025-10-01T11:28:49.285Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "fc01957c-13d7-4902-b4ea-65734153fbb1",
+      "timestamp": "2025-10-01T11:27:33.269Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "ebaf2d84-119b-4b67-96cf-462d14c2c26c",
+      "timestamp": "2025-10-01T11:25:50.293Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "d11529b2-f11c-4199-bb8d-de94b45f4d45",
+      "timestamp": "2025-10-01T11:20:04.503Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "a908a49a-f6d7-49ae-9143-3a7002be3c9f",
+      "timestamp": "2025-10-01T11:17:02.223Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "41b7d68e-bdaa-47ff-a619-647e677eb8d8",
+      "timestamp": "2025-10-01T11:15:23.705Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "f91162d1-e7bb-48a5-a422-9a8bc968e353",
+      "timestamp": "2025-10-01T11:13:21.293Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "8fee8bb5-2f17-4566-81e2-981466fb59b8",
+      "timestamp": "2025-10-01T10:50:49.954Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "2b018a14-acda-4289-a5f7-75215650a385",
+      "timestamp": "2025-10-01T10:35:10.713Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "315365c6-f7c1-4574-829a-a249f0dded1f",
+      "timestamp": "2025-10-01T10:30:35.781Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "b11a0bae-2279-432c-b1b9-df0d6293dcb5",
+      "timestamp": "2025-10-01T10:15:08.362Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "a420cb24-66b6-40c5-ba49-959a18b43ffb",
+      "timestamp": "2025-10-01T10:12:35.233Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "3805d3c8-4663-4ee8-b0dc-5adca550929a",
+      "timestamp": "2025-10-01T10:08:48.423Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "d546fbc7-0f8a-428a-b9b2-9e8768d83067",
+      "timestamp": "2025-10-01T09:47:00.421Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "717f6984-7846-49e0-ab28-ef6888d1650d",
+      "timestamp": "2025-10-01T00:45:33.857Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "051960e4-fbd9-40e2-b74a-627fd38b4182",
+      "timestamp": "2025-10-01T00:43:33.497Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "983298e5-d8dd-445b-acf6-17356a51f5c1",
+      "timestamp": "2025-10-01T00:42:35.146Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "da6374cd-f811-4b77-abcc-8a2dec18d928",
+      "timestamp": "2025-09-30T21:38:47.130Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "25ac65e8-a86a-44a0-8388-c1b785ea9014",
+      "timestamp": "2025-09-30T21:38:23.941Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "72ed0cc6-ba54-492f-a0e0-4bf3285f7f34",
+      "timestamp": "2025-09-30T21:36:42.633Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "57f6c08f-d999-4447-ab2e-78cc7a799ab0",
+      "timestamp": "2025-09-30T21:11:47.675Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "4fedb70e-8847-4b3e-941e-c11efbd2eed6",
+      "timestamp": "2025-09-30T20:38:38.548Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "dacd9435-a53d-43da-bfe9-a8f9781b5dae",
+      "timestamp": "2025-09-30T18:41:55.131Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "55a8cbaa-4095-40db-a5dd-8541e0f0bfc5",
+      "timestamp": "2025-09-30T18:38:55.232Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "f86ced65-dfbe-46bd-818f-74902cea02a1",
+      "timestamp": "2025-09-30T18:37:35.492Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "2d82bd5c-208c-4681-94b9-494490529f08",
+      "timestamp": "2025-09-30T16:56:09.565Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "6cb0e3c5-aab2-490c-92eb-fefcbb06ecee",
+      "timestamp": "2025-09-30T11:17:38.323Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "f491f240-5a99-4d7f-b1a0-f6bafde39041",
+      "timestamp": "2025-09-30T11:11:13.326Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "8010be59-0d23-4c5f-bb65-fb6bfe91cb3d",
+      "timestamp": "2025-09-30T09:40:46.692Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "3f066f8e-37bf-45cb-8586-e12d68e00d02",
+      "timestamp": "2025-09-30T09:37:34.486Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "213658a2-0df5-4288-a36b-cfe513bd470f",
+      "timestamp": "2025-09-30T00:25:41.905Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "8f3acf18-6fe2-4270-892a-83a2aa296a4a",
+      "timestamp": "2025-09-29T23:49:57.359Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "620fbd66-9e55-4ec9-adf2-6ed63cf005d5",
+      "timestamp": "2025-09-29T23:37:14.158Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "bc69f7f6-da15-4d3d-b9c3-5363c67897cf",
+      "timestamp": "2025-09-29T23:27:52.218Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "14c53341-0f44-4af1-9eaa-384028ecdfe6",
+      "timestamp": "2025-09-29T23:26:29.870Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "484f60cd-a170-4dbd-85a1-943d0249d6ad",
+      "timestamp": "2025-09-29T23:25:31.358Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "04ed6d6f-adf1-4397-8fbf-2f7a3ab7737f",
+      "timestamp": "2025-09-29T23:24:32.881Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "22cbe140-e9f1-4bfc-b487-085e28bd9fca",
+      "timestamp": "2025-09-29T23:19:31.512Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "23765d04-d1ab-40b0-8a7d-443d9b391c41",
+      "timestamp": "2025-09-29T23:16:03.555Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "f233b054-5888-486f-a729-838103d8f423",
+      "timestamp": "2025-09-29T23:11:52.216Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "9380700f-cc84-4f78-893e-4b79d08f544f",
+      "timestamp": "2025-09-29T21:06:57.981Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "b43a355a-5048-45bb-9626-9e35e66a5d1d",
+      "timestamp": "2025-09-29T21:05:26.635Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "9fb07b4e-5b14-4936-a5de-9084676375cc",
+      "timestamp": "2025-09-29T21:05:05.116Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "9639ca35-258e-43ea-9387-fb20b33b34f6",
+      "timestamp": "2025-09-29T20:54:11.417Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "9f5ffcb0-741a-4548-a00a-14fa8c2baa16",
+      "timestamp": "2025-09-29T20:43:54.671Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "156031a7-40b6-43ad-93a5-b1d4f78bd708",
+      "timestamp": "2025-09-29T20:43:43.027Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "68685355-3a32-4b4f-b8b6-0a9329469579",
+      "timestamp": "2025-09-29T20:43:12.423Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "5cda2964-cfac-414e-83cf-25991f3bad86",
+      "timestamp": "2025-09-29T20:43:12.400Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "ee6571a1-4f32-4624-9657-07afacff39b1",
+      "timestamp": "2025-09-29T20:40:40.619Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "c7544375-7893-465e-a384-8842ca790f65",
+      "timestamp": "2025-09-29T20:33:34.267Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "16d7249e-3c63-4435-a299-56bbebaebac3",
+      "timestamp": "2025-09-29T20:32:59.345Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "ab8bc6bf-589e-42bf-81df-055521497099",
+      "timestamp": "2025-09-29T20:31:02.267Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "3f610018-9ebe-4317-b83b-b9c4652fdeff",
+      "timestamp": "2025-09-29T20:30:52.780Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "6229492b-8aa3-4f49-b4e5-13c7653fd2bb",
+      "timestamp": "2025-09-29T20:24:58.743Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "05e2822c-e6c9-4a6b-a6f9-3cad0bedc1d2",
+      "timestamp": "2025-09-29T20:18:45.929Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "2bd82dfe-6c62-4e94-ae64-ee6851e8feb3",
+      "timestamp": "2025-09-29T20:17:43.776Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "f80e19d4-2371-4f19-af21-7f7082cd8fb5",
+      "timestamp": "2025-09-29T20:15:54.473Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "8763ebba-7790-4246-b53e-4fef48752e1e",
+      "timestamp": "2025-09-29T19:11:26.610Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "bb2e32d0-5d56-4d18-9e0f-71da9c37f9f4",
+      "timestamp": "2025-09-29T19:07:25.152Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "9f1e30a0-fcc8-4d95-b792-f893ceccab68",
+      "timestamp": "2025-09-29T18:55:24.046Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "06ace6cc-18d4-43bf-8797-a99cf06633ac",
+      "timestamp": "2025-09-29T18:43:31.963Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "432c1ded-faee-4af5-b6cd-6e80194e000c",
+      "timestamp": "2025-09-29T18:37:10.977Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "0660bc01-4eb8-43bf-9b5d-17bc8c733fbd",
+      "timestamp": "2025-09-29T18:28:28.214Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
+    {
+      "id": "80f31c03-252c-4e80-8ce7-668817d008e9",
+      "timestamp": "2025-09-29T18:15:19.331Z",
+      "action": "system_shutdown",
+      "user": "system",
+      "description": "Arr�t du serveur PKI",
+      "severity": "info"
+    },
     {
       "id": "7c3cafb4-1403-456f-9432-d05fd0bacb0c",
       "timestamp": "2025-09-29T17:44:15.237Z",
@@ -76,8 +909,8 @@
       "configuration_changed": 0
     }
   },
-  "timestamp": "2025-09-29T17:44:15.237Z",
+  "timestamp": "2025-10-02T16:14:59.045Z",
   "version": "1.0",
   "initialized": true,
-  "lastModified": "2025-09-29T17:44:15.237Z"
+  "lastModified": "2025-10-02T16:14:59.045Z"
 }

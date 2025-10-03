@@ -1,0 +1,33 @@
+
+
+{
+  "tx_operator": "MTN",
+  "tx_internal_reference": "FINTRAX-REF-MM-987654",
+  "tx_type": "MERCHANT_PAYMENT",
+  "tx_purpose": "Paiement des courses au Supermarché Casino",
+  "tx_amount": 25500,
+  "tx_currency": "XAF",
+  "tx_fee": 650,
+  "tx_fee_tax": 45,
+  "tx_initiation_timestamp": "2025-09-26T15:45:05Z",
+  "tx_completion_timestamp": "2025-09-26T15:45:08Z",
+  "tx_status": "COMPLETED",
+  "tx_channel": "USSD",
+  "initiator_party_type": "INDIVIDUAL2222",
+  "initiator_phone_number": "+242061234567",
+  "initiator_operator": "MTN_CONGO",
+  "initiator_full_name": "Jean-Pierre MAKOSSO",
+  "beneficiary_party_type": "MERCHANT",
+  "beneficiary_phone_number": "+242059876543",
+  "beneficiary_operator": "AIRTEL_CONGO",
+  "beneficiary_trade_name": "Supermarché Casino Poto-Poto",
+  "beneficiary_rccm": "CG/PNR/RCCM/18-A-12345",
+  "beneficiary_full_name": null
+}
+--- SIGNATURE STAMP ---
+{"id":"9715227623ffe2388d025189TTT","when":"2025-10-02T15:57:45.896Z","opts":{"includeTimestamp":true,"visibleSignature":false,"padesSignature":false,"certificateId":"ff00a0cc7c9d10b949061c4cTTT"}}
+
+
+
+--- SIGNATURE STAMP ---
+{"id":"2fc4c97d378dc8390cf29107","when":"2025-10-02T17:04:31.512Z","opts":{"includeTimestamp":true,"visibleSignature":false,"padesSignature":false,"certificateId":"ac896cc7a8ceb7793beed085"}}

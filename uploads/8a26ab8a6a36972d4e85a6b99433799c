@@ -1,0 +1,91 @@
+Complete Directory Structure:
+
+└── ./
+    ├── app
+    │   ├── config
+    │   │   ├── channels.js ✓
+    │   │   ├── database.js ✓
+    │   │   ├── env.js ✓
+    │   │   ├── index.js ✓
+    │   │   └── security.js ✓
+    │   ├── controllers
+    │   │   ├── authController.js ✓
+    │   │   ├── dashboardController.js ✓
+    │   │   ├── entityController.js ✓
+    │   │   ├── entityTypeController.js ✓
+    │   │   ├── formController.js ✓
+    │   │   ├── formTemplateController.js ✓
+    │   │   ├── kycController.js ✓
+    │   │   ├── logController.js ✓
+    │   │   ├── maskTemplateController.js ✓
+    │   │   ├── n8nWebhookController.js ✓
+    │   │   ├── permissionController.js ✓
+    │   │   ├── publicFormController.js ✓
+    │   │   ├── roleController.js ✓
+    │   │   ├── royaltyResultController.js ✓
+    │   │   ├── royaltyRulesController.js ✓
+    │   │   ├── settingsController.js ✓
+    │   │   ├── statementController.js ✓
+    │   │   ├── statementGroupController.js ✓
+    │   │   ├── statementManualTempController.js ✓
+    │   │   └── userController.js ✓
+    │   ├── db
+    │   │   ├── migrations
+    │   │   │   ├── 20250527100222-create-roles.js ✓
+    │   │   │   ├── 20250527100246-create-entity-types.js ✓
+    │   │   │   ├── 20250527100301-create-entities.js ✓
+    │   │   │   ├── 20250527100303-create-user.js ✓
+    │   │   │   ├── 20250527111137-create-role.js ✓
+    │   │   │   ├── 20250527113232-create-kyc.js ✓
+    │   │   │   ├── 20250527114646-create-user-roles.js ✓
+    │   │   │   ├── 20250529223317-create-fiscal-rule.js ✓
+    │   │   │   ├── 20250529224011-create-mask-template.js ✓
+    │   │   │   ├── 20250529224012-create-form-template.js ✓
+    │   │   │   ├── 20250531112222-create-form-template-entity-type.js ✓
+    │   │   │   ├── 20250602093651-create-statement-manual-temps.js ✓
+    │   │   │   ├── 20250605160003-create-statement-group.js ✓
+    │   │   │   ├── 20250605160004-create-statement.js ✓
+    │   │   │   ├── 20250610131047-create-log.js ✓
+    │   │   │   ├── 20250619124200-add-update_data-to-log-action-enum.js ✓
+    │   │   │   ├── 20250619132136-add-zone-to-statements.js ✓
+    │   │   │   ├── 20250619132830-change-action-type-in-logs.js ✓
+    │   │   │   ├── 20250620123359-create-royalty-rules.js ✓
+    │   │   │   ├── 20250620123416-create-royalty-result.js ✓
+    │   │   │   ├── 20250620123417-create-royalty-calculation-logs.js ✓
+    │   │   │   ├── 20250624105231-add-fieldMappings-to-mask-templates.js ✓
+    │   │   │   ├── 20250624105240-add-rejected-to-royalty-result-status-enum.js ✓
+    │   │   │   ├── 20250626172158-create-royalty-calculation-group.js ✓
+    │   │   │   ├── 20250626173221-add-royaltyCalculationGroupId-to-RoyaltyResult.js ✓
+    │   │   │   ├── 20250629173252-add_geolocation_and_contact_to_entity.js ✓
+    │   │   │   ├── 20250704114141-add-rolesData-to-User.js ✓
+    │   │   │   ├── 20250707115459-create-permission.js ✓
+    │   │   │   ├── 20250707120100-create-role-permission.js ✓
+    │   │   │   ├── 20250707120150-add-description-to-role.js ✓
+    │   │   │   ├── 20250709121604-add-PhoneNumber-To-Users copy.js ✓
+    │   │   │   ├── 20250709121804-add-originalData-To-statementManualTemp.js ✓
+    │   │   │   ├── 20250711151726-addMonthYearToStatementManualTemps.js ✓
+    │   │   │   ├── 20250712133416-add-taxeType-to-statementManualTemp.js ✓
+    │   │   │   ├── 20250712141549-add-tax-period-to-statement-group.js ✓
+    │   │   │   ├── 20250715151731-add-RoyaltyCalculationGroupId-To-RoyaltyCalculationLogs.js ✓
+    │   │   │   └── 20250728124217-add-declareDate-to-StatementManualTemp.js ✓
+    │   │   └── seeders
+    │   │       ├── 20250527100822-roles-seeder.js ✓
+    │   │       ├── 20250527100823-entity-types-seeder.js ✓
+    │   │       ├── 20250527100825--entities-seeder.js copy.js ✓
+    │   │       ├── 20250527100825--entities-seeder.js.js ✓
+    │   │       ├── 20250527100825-super-admin-seeder.js ✓
+    │   │       ├── 20250527101258-kyc-seeder.js.js ✓
+    │   │       ├── 20250527105100-create-entities.js ✓
+    │   │       ├── 20250527105105-create-artf-users.js ✓
+    │   │       ├── 20250527105900-create-entities.js.js ✓
+    │   │       ├── 20250527105901-create-mask-templates.js ✓
+    │   │       ├── 20250527105902-create-form-templates.js ✓
+    │   │       ├── 20250707121741-permissions-seeder.js ✓
+    │   │       ├── 20250707121745-custom-permissions-seeder.js ✓
+    │   │       └── 20250707124635-assign-admin-permissions-seeder.js ✓
+    │   ├── locales
+    │   │   ├── en.json ✓
+    │   │   └── fr.json ✓
+    │   ├── middlewares
+    │   │   ├── validators
+    │   │   │   ├── authValidator

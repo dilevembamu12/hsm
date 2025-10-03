@@ -1,0 +1,51 @@
+Complete Directory Structure:
+
+└── ./
+    ├── app
+    │   ├── config
+    │   │   ├── channels.js ✓
+    │   │   ├── database.js ✓
+    │   │   ├── env.js ✓
+    │   │   ├── index.js ✓
+    │   │   └── security.js ✓
+    │   ├── controllers
+    │   │   ├── authController.js ✓
+    │   │   ├── dashboardController.js ✓
+    │   │   ├── entityController.js ✓
+    │   │   ├── entityTypeController.js ✓
+    │   │   ├── formController.js ✓
+    │   │   ├── formTemplateController.js ✓
+    │   │   ├── kycController.js ✓
+    │   │   ├── logController.js ✓
+    │   │   ├── maskTemplateController.js ✓
+    │   │   ├── n8nWebhookController.js ✓
+    │   │   ├── permissionController.js ✓
+    │   │   ├── publicFormController.js ✓
+    │   │   ├── roleController.js ✓
+    │   │   ├── royaltyResultController.js ✓
+    │   │   ├── royaltyRulesController.js ✓
+    │   │   ├── settingsController.js ✓
+    │   │   ├── statementController.js ✓
+    │   │   ├── statementGroupController.js ✓
+    │   │   ├── statementManualTempController.js ✓
+    │   │   └── userController.js ✓
+    │   ├── db
+    │   │   ├── migrations
+    │   │   │   ├── 20250527100222-create-roles.js ✓
+    │   │   │   ├── 20250527100246-create-entity-types.js ✓
+    │   │   │   ├── 20250527100301-create-entities.js ✓
+    │   │   │   ├── 20250527100303-create-user.js ✓
+    │   │   │   ├── 20250527111137-create-role.js ✓
+    │   │   │   ├── 20250527113232-create-kyc.js ✓
+    │   │   │   ├── 20250527114646-create-user-roles.js ✓
+    │   │   │   ├── 20250529223317-create-fiscal-rule.js ✓
+    │   │   │   ├── 20250529224011-create-mask-template.js ✓
+    │   │   │   ├── 20250529224012-create-form-template.js ✓
+    │   │   │   ├── 20250531112222-create-form-template-entity-type.js ✓
+    │   │   │   ├── 20250602093651-create-statement-manual-temps.js ✓
+    │   │   │   ├── 20250605160003-create-statement-group.js ✓
+    │   │   │   ├── 20250605160004-create-statement.js ✓
+    │   │   │   ├── 20250610131047-create-log.js ✓
+    │   │   │   ├── 20250619124200-add-update_data-to-log-action-enum.js ✓
+    │   │   │   ├── 20250619132136-add-zone-to-statements.js ✓
+    │   │   │   ├── 20250619132830-change-action-type-in-logs.js ✓

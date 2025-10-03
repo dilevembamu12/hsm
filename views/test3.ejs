@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>FintraX — Diagnostic HSM / PKI</title>
+
+  <!-- charge la config runtime -->
+  <script src="/config.js"></script>
+
+  <script>
+    // ---------- Helpers ----------
+    const $ = (q)=>document.querySelector(q);
+    const now = ()=>new Date().toLocaleTimeString();
+
+    function logLine(msg, cls='') {
+      const el = document.createElement('div');
+      if (cls) el.className = cls;
+      el.textContent = `[${now()}] ${msg}`;
+      $('#log').prepend(el);
+    }
+    function logBlock(title, content) {
+      const d = document.createElement('details');
+      const s = document.createElement('summary');
+      const p = document.createElement('pre');
+      s.textContent = title;
+      p.textContent = content;
+      d.appendChild(s); d.appendChild(p);
+      $('#log').prepend(d);
+    }
+    async function api(path, opts={}) {
+      const base = (window.APP_CONFIG?.api?.base || window.location.origin).replace(/\/$/, '');
+      const url = base + path;
+      let res, txt='';
+      try { res = await fetch(url, { ...opts }); }
+      catch (e) { return { ok:false, status:0, data:{ error: e.message || 'fetch error' } }; }
+      try { txt = await res.text(); } catch {}
+      try { return { ok: res.ok, status: res.status, data: JSON.parse(txt), raw: txt }; }
+      catch { return { ok: res.ok, status: res.status, data: { raw: txt } }; }
+    }
+
+    // ---------- Checks ----------
+    async function checkServerHealth() {
+      logLine('Santé serveur…');
+      const h  = await api('/api/health');
+      const hd = await api('/api/health/detailed');
+
+      if (h.ok) logLine('✅ /api/health OK', 'text-green-700'); else logLine(`❌ /api/health: HTTP ${h.status}`, 'text-red-700');
+      logBlock('health', JSON.stringify(h.data||{}, null, 2));
+
+      if (hd.ok) logLine('✅ /api/health/detailed OK', 'text-green-700'); else logLine(`❌ /api/health/detailed: HTTP ${hd.status}`, 'text-red-700');
+      logBlock('health/detailed', JSON.stringify(hd.data||{}, null, 2));
+    }
+
+    async function checkHsmStatus() {
+      logLine('Statut SC-HSM…');
+      const r = await api('/api/pkcs11/sc-hsm-status');
+      if (r.ok) {
+        logLine('✅ SC-HSM status OK', 'text-green-700');
+        const out = r.data?.stdout || r.raw || JSON.stringify(r.data||{}, null, 2);
+        logBlock('📇 sc-hsm-status', out);
+      } else {
+        const msg = r.data?.error || r.data?.raw || `HTTP ${r.status}`;
+        logLine(`❌ SC-HSM status: ${msg}`, 'text-red-700');
+      }
+    }
+
+    async function checkPkcs11Capabilities() {
+      logLine('Capacités PKCS#11…');
+      const r = await api('/api/pkcs11/capabilities');
+      if (r.ok) {
+        logLine('✅ /api/pkcs11/capabilities OK', 'text-green-700');
+        logBlock('⚙️ capabilities', JSON.stringify(r.data||{}, null, 2));
+      } else {
+        const msg = r.data?.error || r.data?.raw || `HTTP ${r.status}`;
+        logLine(`❌ capabilities: ${msg}`, 'text-red-700');
+      }
+    }
+
+    async function showDashboardSnapshot() {
+      logLine('Snapshot dashboard…');
+      const r = await api('/api/pki/dashboard/stats');
+      if (r.ok) {
+        const s = r.data || {};
+        logLine(`✅ Dashboard: actifs=${s.activeCertificates||0}, expirant_bientôt=${s.expiringSoon||0}, signatures/mois=${s.signaturesThisMonth||0}`, 'text-green-700');
+        logBlock('📊 dashboard/stats', JSON.stringify(s, null, 2));
+      } else {
+        const msg = r.data?.error || r.data?.raw || `HTTP ${r.status}`;
+        logLine(`❌ dashboard/stats: ${msg}`, 'text-red-700');
+      }
+    }
+
+    async function listCertificates() {
+      logLine('Listing certificats…');
+      const r = await api('/api/pki/certificates');
+      if (r.ok) {
+        const list = Array.isArray(r.data?.certificates) ? r.data.certificates : (Array.isArray(r.data) ? r.data : []);
+        logLine(`✅ Certificats: ${list.length}`, 'text-green-700');
+        logBlock('📜 certificates', JSON.stringify(list, null, 2));
+      } else {
+        const msg = r.data?.error || r.data?.raw || `HTTP ${r.status}`;
+        logLine(`❌ certificates: ${msg}`, 'text-red-700');
+      }
+    }
+
+    async function listSignatures() {
+      logLine('Listing signatures…');
+      const r = await api('/api/pki/signatures');
+      if (r.ok) {
+        const list = Array.isArray(r.data?.signatures) ? r.data.signatures : (Array.isArray(r.data) ? r.data : []);
+        logLine(`✅ Signatures: ${list.length}`, 'text-green-700');
+        const printable = list.map(s => ({
+          id:          s.id,
+          documentName:s.documentName || s.name || 'Document',
+          signedAt:    s.signedAt || s.timestamp || s.ts || null,
+          status:      s.status || (s.ok===true ? 'valid' : (s.ok===false ? 'invalid' : 'unknown')),
+          downloadUrl: s.downloadUrl || s.url || (s.id ? `/downloads/signatures/${s.id}` : undefined)
+        }));
+        logBlock('🖊️ signatures', JSON.stringify(printable, null, 2));
+      } else {
+        const msg = r.data?.error || r.data?.raw || `HTTP ${r.status}`;
+        logLine(`❌ signatures: ${msg}`, 'text-red-700');
+      }
+    }
+
+    // ---------- Initialisation & keygen ----------
+    // POST /api/pkcs11/init — envoie les PIN si fournis, sinon .env côté serveur
+    async function initFromEnv() {
+      logLine('Initialisation SC-HSM…');
+
+      const soPin  = $('#initSoPin')?.value.trim();
+      const userPin= $('#initUserPin')?.value.trim();
+      const payload = {};
+      if (soPin)  payload.soPin  = soPin;
+      if (userPin)payload.userPin= userPin;
+
+      // validations côté UI (pour feedback rapide)
+      if (soPin && !/^\d{8}$/.test(soPin)) {
+        logLine('❌ SO-PIN doit contenir exactement 8 chiffres.', 'text-red-700'); return;
+      }
+      if (userPin && !/^\d{6,15}$/.test(userPin)) {
+        logLine('❌ PIN utilisateur doit contenir 6 à 15 chiffres.', 'text-red-700'); return;
+      }
+
+      const r = await api('/api/pkcs11/init', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (r.ok && (r.data?.ok !== false)) {
+        logLine('✅ SC-HSM initialisé.', 'text-green-700');
+        if (r.data?.stdout) logBlock('sc-hsm-tool output', r.data.stdout);
+      } else {
+        logLine(`❌ Init: ${r.data?.error || r.data?.raw || ('HTTP '+r.status)}`, 'text-red-700');
+        if (r.data?.stdout) logBlock('stdout', r.data.stdout);
+      }
+      await checkHsmStatus();
+    }
+
+    // POST /api/pkcs11/set-so-pin — (si non câblé serveur => 404/501 attendu)
+    async function changeSoPin() {
+      const oldSoPin = $('#oldSoPin')?.value.trim();
+      const newSoPin = $('#newSoPin')?.value.trim();
+      if (!oldSoPin || !newSoPin) {
+        logLine('❌ Renseignez l’ancien et le nouveau SO-PIN.', 'text-red-700'); return;
+      }
+      if (!/^\d{8}$/.test(oldSoPin) || !/^\d{8}$/.test(newSoPin)) {
+        logLine('❌ SO-PIN = 8 chiffres.', 'text-red-700'); return;
+      }
+      logLine('Changement du SO-PIN…');
+      const r = await api('/api/pkcs11/set-so-pin', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ oldSoPin, newSoPin })
+      });
+      if (r.ok && (r.data?.ok !== false)) {
+        logLine('✅ SO-PIN changé.', 'text-green-700');
+        if (r.data?.stdout) logBlock('stdout', r.data.stdout);
+      } else {
+        logLine(`❌ set-so-pin: ${r.data?.error || r.data?.raw || ('HTTP '+r.status)}`, 'text-red-700');
+      }
+    }
+
+    // POST /api/pkcs11/keygen — génère une paire (RSA ou EC) dans le token
+    async function generateKeypair() {
+      const pin   = $('#kgPin')?.value.trim();
+      const type  = $('#kgType')?.value || 'rsa';
+      const label = $('#kgLabel')?.value.trim() || (type.toUpperCase() + '-' + Date.now());
+      const id    = $('#kgId')?.value.trim() || '01';
+
+      if (!pin) { logLine('❌ PIN utilisateur requis pour la session.', 'text-red-700'); return; }
+      if (!/^\d{6,15}$/.test(pin)) { logLine('❌ PIN = 6 à 15 chiffres.', 'text-red-700'); return; }
+
+      let payload = { pin, type, id, label };
+      if (type === 'rsa') {
+        const bits = parseInt($('#kgBits')?.value || '2048', 10);
+        if (![2048,3072,4096].includes(bits)) {
+          logLine('❌ Taille RSA invalide.', 'text-red-700'); return;
+        }
+        payload.bits = bits;
+      } else { // ec
+        const curve = $('#kgCurve')?.value || 'P-256';
+        if (!/^P-(256|384)$/.test(curve)) {
+          logLine('❌ Courbe EC invalide.', 'text-red-700'); return;
+        }
+        payload.curve = curve;
+      }
+
+      logLine(`Génération de clé ${type.toUpperCase()}…`);
+      const r = await api('/api/pkcs11/keygen', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (r.ok && (r.data?.ok !== false)) {
+        logLine('✅ Keypair créé dans le HSM.', 'text-green-700');
+        if (r.data?.stdout) logBlock('keygen stdout', r.data.stdout);
+      } else {
+        logLine(`❌ keygen: ${r.data?.error || r.data?.raw || ('HTTP '+r.status)}`, 'text-red-700');
+        if (r.data?.stdout) logBlock('stdout', r.data.stdout);
+      }
+    }
+
+    // ---------- Diagnostic global ----------
+    async function runQuickDiagnostic() {
+      const box = $('#log'); if (box) box.innerHTML = '';
+      logLine('=== Début diagnostic devops.js ===', 'font-semibold');
+      await checkServerHealth();
+      await checkHsmStatus();
+      await checkPkcs11Capabilities();
+      await showDashboardSnapshot();
+      await listCertificates();
+      await listSignatures();
+      logLine('=== Fin diagnostic ===', 'font-semibold');
+    }
+
+    // Expose sur window (pour les onclick)
+    window.addEventListener('DOMContentLoaded', runQuickDiagnostic);
+    window.runQuickDiagnostic = runQuickDiagnostic;
+    window.checkServerHealth  = checkServerHealth;
+    window.checkHsmStatus     = checkHsmStatus;
+    window.checkPkcs11Capabilities = checkPkcs11Capabilities;
+    window.showDashboardSnapshot   = showDashboardSnapshot;
+    window.listCertificates   = listCertificates;
+    window.listSignatures     = listSignatures;
+    window.initFromEnv        = initFromEnv;
+    window.changeSoPin        = changeSoPin;
+    window.generateKeypair    = generateKeypair;
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    details > summary { cursor: pointer; }
+    details > pre { padding: 1em; background: #eee; border-radius: 0.5em; overflow-x: auto; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-5xl mx-auto p-6 space-y-6">
+    <header class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">FintraX — Diagnostic HSM / PKI</h1>
+      <a href="/" class="text-sm text-blue-600 hover:underline">Accueil</a>
+    </header>
+
+    <!-- Actions de base -->
+    <section class="bg-white rounded-xl shadow p-4">
+      <h2 class="font-medium mb-3">Actions rapides</h2>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <button class="px-4 py-2 rounded bg-gray-900 text-white" onclick="runQuickDiagnostic()">🔎 Diagnostic rapide</button>
+        <button class="px-4 py-2 rounded bg-blue-600 text-white" onclick="checkServerHealth()">🩺 Santé serveur</button>
+        <button class="px-4 py-2 rounded bg-emerald-600 text-white" onclick="checkHsmStatus()">🛡️ Statut SC-HSM</button>
+        <button class="px-4 py-2 rounded bg-indigo-600 text-white" onclick="checkPkcs11Capabilities()">⚙️ Capacités PKCS#11</button>
+        <button class="px-4 py-2 rounded bg-purple-600 text-white" onclick="showDashboardSnapshot()">📊 Dashboard</button>
+        <button class="px-4 py-2 rounded bg-teal-600 text-white" onclick="listCertificates()">📜 Certificats</button>
+        <button class="px-4 py-2 rounded bg-amber-600 text-white" onclick="listSignatures()">🖊️ Signatures</button>
+      </div>
+    </section>
+
+    <!-- Initialisation & gestion PIN -->
+    <section class="bg-white rounded-xl shadow p-4">
+      <h2 class="font-medium mb-3">Initialisation de la carte & PIN</h2>
+
+      <!-- NEW: optional init pins -->
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end mb-3">
+        <div class="relative">
+          <label class="block text-sm mb-1">SO-PIN (8 chiffres, optionnel)</label>
+          <input id="initSoPin" type="password" inputmode="numeric" placeholder="Ex: 12345678" class="form-input border rounded px-3 py-2 w-full"/>
+        </div>
+        <div class="relative">
+          <label class="block text-sm mb-1">PIN utilisateur (6–15 chiffres, optionnel)</label>
+          <input id="initUserPin" type="password" inputmode="numeric" placeholder="Ex: 123456" class="form-input border rounded px-3 py-2 w-full"/>
+        </div>
+        <button class="px-4 py-2 rounded bg-sky-700 text-white" onclick="initFromEnv()">🧩 Initialiser la carte (.env ou ci-dessus)</button>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
+        <div class="relative">
+          <input id="oldSoPin" type="password" inputmode="numeric" placeholder="Ancien SO-PIN" class="form-input border rounded px-3 py-2 w-full"/>
+        </div>
+        <div class="relative">
+          <input id="newSoPin" type="password" inputmode="numeric" placeholder="Nouveau SO-PIN" class="form-input border rounded px-3 py-2 w-full"/>
+        </div>
+        <button class="px-4 py-2 rounded bg-rose-700 text-white" onclick="changeSoPin()">🔒 Changer le SO-PIN</button>
+      </div>
+
+      <p class="text-xs text-slate-500 mt-2">
+        Si vous laissez les champs vides, le serveur utilisera <code>SC_HSM_SO_PIN</code> et <code>SC_HSM_USER_PIN</code> du fichier <code>.env</code>.
+        Formats: SO-PIN = 8 chiffres, PIN utilisateur = 6–15 chiffres.
+      </p>
+    </section>
+
+    <!-- Génération de paire de clés -->
+    <section class="bg-white rounded-xl shadow p-4">
+      <h2 class="font-medium mb-3">Générer une paire de clés dans le HSM</h2>
+      <div class="grid gap-3 lg:grid-cols-6">
+        <div class="lg:col-span-2">
+          <label class="block text-sm mb-1">PIN utilisateur (connexion)</label>
+          <input id="kgPin" type="password" inputmode="numeric" class="form-input border rounded px-3 py-2 w-full" placeholder="PIN HSM">
+        </div>
+
+        <div>
+          <label class="block text-sm mb-1">Type</label>
+          <select id="kgType" class="form-input border rounded px-3 py-2 w-full" onchange="
+            document.getElementById('rsaOpts').classList.toggle('hidden', this.value!=='rsa');
+            document.getElementById('ecOpts').classList.toggle('hidden', this.value!=='ec');
+          ">
+            <option value="rsa" selected>RSA</option>
+            <option value="ec">ECDSA</option>
+          </select>
+        </div>
+
+        <div id="rsaOpts">
+          <label class="block text-sm mb-1">Taille RSA</label>
+          <select id="kgBits" class="form-input border rounded px-3 py-2 w-full">
+            <option value="2048" selected>2048</option>
+            <option value="3072">3072</option>
+            <option value="4096">4096</option>
+          </select>
+        </div>
+
+        <div id="ecOpts" class="hidden">
+          <label class="block text-sm mb-1">Courbe EC</label>
+          <select id="kgCurve" class="form-input border rounded px-3 py-2 w-full">
+            <option value="P-256" selected>P-256</option>
+            <option value="P-384">P-384</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm mb-1">ID objet (hex/dec)</label>
+          <input id="kgId" class="form-input border rounded px-3 py-2 w-full" placeholder="01">
+        </div>
+
+        <div>
+          <label class="block text-sm mb-1">Label</label>
+          <input id="kgLabel" class="form-input border rounded px-3 py-2 w-full" placeholder="FX-KEY">
+        </div>
+
+        <div class="lg:col-span-6">
+          <button class="px-4 py-2 rounded bg-emerald-700 text-white" onclick="generateKeypair()">🔐 Générer la paire</button>
+          <p class="text-xs text-slate-500 mt-2">Appelle <code>POST /api/pkcs11/keygen</code> avec <code>{ pin, type, bits|curve, id, label }</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Journal -->
+    <section class="bg-white rounded-xl shadow p-4">
+      <h2 class="font-medium mb-3">Journal</h2>
+      <div id="log" class="space-y-2 text-sm font-mono whitespace-pre-wrap"></div>
+    </section>
+  </div>
+</body>
+</html>

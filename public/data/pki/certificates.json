@@ -1,6 +1,21 @@
 {
-  "total": 0,
-  "certificates": [],
+  "total": 1,
+  "certificates": [
+    {
+      "id": "ac896cc7a8ceb7793beed085",
+      "subject": "CN=api.bank.cd, O=BCC, OU=IT, C=CD, L=KINSHASA, emailAddress=emodiembamu@gmail.com",
+      "issuer": "CN=FIntraX Demo CA, O=FIntraX Congo, C=CD",
+      "serial": "52846A2BF887ACA5",
+      "issued": "2025-10-02T17:02:44.824Z",
+      "expires": "2026-10-02T17:02:44.824Z",
+      "status": "valid",
+      "type": "server",
+      "keyType": "RSA",
+      "keySize": "2048",
+      "algorithm": "RSA-2048",
+      "email": "emodiembamu@gmail.com"
+    }
+  ],
   "filters": {
     "status": {
       "valid": 0,

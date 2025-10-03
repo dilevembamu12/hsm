@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTN Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --text-color: #e0e0e0;
+            --background-start: #0e0e1a;
+            --background-end: #0a0a14;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-color);
+            background: linear-gradient(180deg, var(--background-start) 0%, var(--background-end) 100%);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .dashboard-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .background-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://placehold.co/1920x1080/0e0e1a/808080?text=Dashboard+Background');
+            background-size: cover;
+            background-position: center;
+            filter: brightness(0.6) blur(2px);
+            z-index: -1;
+            transform: scale(1.05);
+        }
+
+        .content-area {
+            flex-grow: 1;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2.5rem 4rem;
+            max-width: 1200px;
+            width: 100%;
+            padding: 2rem;
+        }
+
+        .icon-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+
+        .icon-item:hover {
+            transform: scale(1.1);
+            filter: brightness(1.2);
+        }
+
+        .icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        .icon svg {
+            width: 32px;
+            height: 32px;
+            fill: #fff;
+        }
+
+        .icon.blue-bg { background: linear-gradient(135deg, #4c66f5, #2c44e0); }
+        .icon.gold-bg { background: linear-gradient(135deg, #f5d14c, #e0a32c); }
+        .icon.purple-bg { background: linear-gradient(135deg, #a066f5, #8044e0); }
+        .icon.green-bg { background: linear-gradient(135deg, #66f5a0, #44e080); }
+        .icon.red-bg { background: linear-gradient(135deg, #f56666, #e04444); }
+        .icon.orange-bg { background: linear-gradient(135deg, #f5a066, #e08044); }
+        .icon.gray-bg { background: linear-gradient(135deg, #a0a0a0, #808080); }
+
+        .icon-glow {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 30px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 50px 20px rgba(255, 255, 255, 0.3);
+            animation: pulse-glow 2s infinite alternate ease-in-out;
+            z-index: -1;
+        }
+
+        @keyframes pulse-glow {
+            from { transform: translate(-50%, -50%) scale(0.95); opacity: 0.8; }
+            to { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+        }
+
+        .icon-text {
+            margin-top: 0.8rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        .taskbar {
+            width: 98%;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+            margin-bottom: 1rem;
+            padding: 0 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .taskbar-left, .taskbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .taskbar-item {
+            display: flex;
+            align-items: center;
+            color: #d0d0d0;
+            font-size: 0.85rem;
+        }
+        
+        .taskbar-item span {
+            display: block;
+            margin-left: 0.25rem;
+        }
+
+        .taskbar-icon {
+            width: 20px;
+            height: 20px;
+            fill: #d0d0d0;
+            cursor: pointer;
+            transition: fill 0.2s;
+        }
+        
+        .taskbar-icon:hover {
+            fill: #fff;
+        }
+
+        #time, #date {
+            font-size: 0.85rem;
+        }
+
+        .search-bar {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.25rem 0.5rem;
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+            max-width: 300px;
+        }
+
+        .search-bar svg {
+            width: 16px;
+            height: 16px;
+            fill: #d0d0d0;
+            margin-right: 0.5rem;
+        }
+
+        .search-bar input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            width: 100%;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 768px) {
+            .icon-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 2rem;
+            }
+            .taskbar {
+                flex-direction: column;
+                height: auto;
+                padding: 1rem 0.5rem;
+            }
+            .taskbar-left, .taskbar-right {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .search-bar {
+                width: 90%;
+                margin: 0.5rem 0;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="background-image"></div>
+        <div class="content-area">
+            <div class="icon-grid">
+                <div class="icon-item">
+                    <div class="icon blue-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Access Control</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon gold-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Settings</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon blue-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">ADM Defender</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon purple-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Dr. ASUS Lok</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon red-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">App Control</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon purple-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Storage Manager</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon green-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">File Explorer</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon green-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Backup Centrel</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon purple-bg">
+                        <div class="icon-glow"></div>
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">EZ Sync Manager</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon gray-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Activity Monitor</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon blue-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Services</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon green-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Snapshot Center</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon orange-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">External Devices</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon blue-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Web Center</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon blue-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">System Information</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon green-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Online Help</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon blue-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">Cloud Backup Center</span>
+                </div>
+                <div class="icon-item">
+                    <div class="icon red-bg">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <span class="icon-text">ClamAV</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="taskbar">
+            <div class="taskbar-left">
+                <svg class="taskbar-icon" viewBox="0 0 24 24"><path d="M12 2c5.52 0 10 4.48 10 10s-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2zm0 2c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zM7 13h4v4H7zm6 0h4v4h-4zm-6-6h4v4H7zm6 0h4v4h-4z"/></svg>
+                <div class="search-bar">
+                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM9.5 14C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    <input type="text" placeholder="Search">
+                </div>
+            </div>
+            <div class="taskbar-right">
+                <span id="time"></span>
+                <span id="date"></span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const timeElement = document.getElementById('time');
+            const dateElement = document.getElementById('date');
+
+            function updateDateTime() {
+                const now = new Date();
+                
+                let hours = now.getHours();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? hours : 12; // The hour '0' should be '12'
+                const timeString = `${hours}:${minutes} ${ampm}`;
+                timeElement.textContent = timeString;
+
+                const dateOptions = { month: '2-digit', day: '2-digit', year: 'numeric' };
+                const dateString = now.toLocaleDateString('en-US', dateOptions);
+                dateElement.textContent = dateString;
+            }
+
+            updateDateTime();
+            setInterval(updateDateTime, 60000); // Update every minute
+        });
+    </script>
+</body>
+</html>

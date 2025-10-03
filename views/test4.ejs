@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>FintraX — Tests HSM (CLI + Exécution + Ollama)</title>
+
+  <script src="/config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .code { background:#0b1020; color:#e5f0ff; border-radius:.5rem; padding:1rem; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85rem; overflow:auto }
+    .btn  { padding:.5rem .75rem; border-radius:.5rem; color:#fff; }
+    .btn-copy { background:#111827; }
+    .btn-run  { background:#2563eb; }
+    .btn-alt  { background:#059669; }
+    .btn-warn { background:#d97706; }
+    .btn-oll  { background:#7c3aed; }
+    details > summary { cursor: pointer; }
+    .muted { color:#64748b }
+  </style>
+
+  <script>
+    const $ = (q)=>document.querySelector(q);
+    const now = ()=>new Date().toLocaleTimeString();
+    const log = (msg, cls='')=>{
+      const d=document.createElement('div'); if(cls) d.className=cls;
+      d.textContent = `[${now()}] ${msg}`; $('#log').prepend(d);
+    };
+    async function api(path, opts={}) {
+      const base = (window.APP_CONFIG?.api?.base || window.location.origin).replace(/\/$/, '');
+      const url = base + path;
+      let res, txt=''; try { res = await fetch(url, { ...opts }); } catch(e) { return { ok:false, status:0, data:{ error: e.message } }; }
+      try { txt = await res.text(); } catch {}
+      try { return { ok: res.ok, status:res.status, data: JSON.parse(txt), raw:txt }; }
+      catch { return { ok: res.ok, status:res.status, data:{ raw:txt } }; }
+    }
+    function setVal(id, v){ const el=$(id); if(el) el.value=v; }
+    function b64ToPemPub(derB64) {
+      const lines = derB64.match(/.{1,64}/g) || [derB64];
+      return ['-----BEGIN PUBLIC KEY-----', ...lines, '-----END PUBLIC KEY-----'].join('\n');
+    }
+    let DETECTED_MODULE = '/usr/local/lib/libsc-hsm-pkcs11.so';
+
+    // -------- Ollama helpers --------
+    function collectAllOutputs() {
+      const blocks = [
+        ['[STATUT/DETECTION]', $('#out0')?.textContent || ''],
+        ['[OBJECTS]', $('#objectsOut')?.textContent || ''],
+        ['[NON-EXTRACTIBILITÉ]', $('#outA')?.textContent || ''],
+        ['[PUBKEY]', $('#outB')?.textContent || ''],
+        ['[SIGNATURE RSA]', $('#outCRSA')?.textContent || ''],
+        ['[SIGNATURE ECDSA]', $('#outCEC')?.textContent || ''],
+        ['[MÉCANISMES]', $('#outM')?.textContent || ''],
+      ];
+      const filled = blocks.filter(([_, t]) => t && t.trim().length);
+      if (!filled.length) return 'Aucune sortie disponible pour analyse.';
+      return filled.map(([h, t]) => `${h}\n${t}`).join('\n\n');
+    }
+    async function analyzeWithOllama(text, intentLabel='Analyse') {
+      const prompt = `Tu es un expert HSM/PKI. Analyse les résultats ci-dessous.
+- Déduis l’état du HSM, la présence de token/cartes.
+- Repère les erreurs PKCS#11 et propose des causes probables (CKR_*).
+- Vérifie si les clés sont non-extractibles, si les signatures semblent OK, et si les mécanismes requis sont présents.
+- Donne des actions concrètes de remédiation si nécessaire.
+Résultats à analyser:
+${text}`;
+
+      $('#ollamaStatus').textContent = `⏳ ${intentLabel} en cours…`;
+      $('#ollamaOut').textContent = '';
+      const r = await api('/api/ai/ollama/analyze', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      if (r.ok && r.data?.text) {
+        $('#ollamaStatus').textContent = '✅ Analyse terminée';
+        $('#ollamaOut').textContent = r.data.text;
+      } else {
+        $('#ollamaStatus').textContent = '❌ Erreur';
+        $('#ollamaOut').textContent = `Impossible d’analyser: ${r.data?.error || r.status}`;
+      }
+    }
+
+    // -------- Existing logic (kept) --------
+    async function detectModule() {
+      const r = await api('/api/pkcs11/capabilities');
+      if (r.ok) {
+        DETECTED_MODULE = r.data?.modulePath || DETECTED_MODULE;
+        setVal('#modulePath', DETECTED_MODULE);
+        log(`Module détecté: ${DETECTED_MODULE}`, 'text-green-700');
+      } else {
+        log(`Impossible de détecter le module (fallback utilisé)`, 'text-amber-700');
+      }
+    }
+    async function listObjects() {
+      const pin = $('#pin').value.trim();
+      if (!/^\d{6,15}$/.test(pin)) { log('PIN invalide (6–15 chiffres).', 'text-red-700'); return; }
+      log('Listing objets…');
+      const r = await api('/api/pkcs11/objects', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ pin })
+      });
+      if (r.ok) {
+        const out = r.data?.stdout || r.raw || '';
+        $('#objectsOut').textContent = out || '(vide)';
+        log('Objets listés (voir ci-dessous).', 'text-green-700');
+      } else {
+        log(`Erreur listage objets: ${r.data?.error || r.status}`, 'text-red-700');
+      }
+    }
+    async function execDetect() {
+      $('#exec0').textContent = 'Exécution…';
+      const r1 = await api('/api/pkcs11/capabilities');
+      const r2 = await api('/api/pkcs11/sc-hsm-status');
+      const parts = [];
+      parts.push('== pkcs11-tool --version / module ==');
+      parts.push(JSON.stringify(r1.data || {}, null, 2));
+      parts.push('\n== sc-hsm-tool -S ==');
+      parts.push((r2.data && r2.data.stdout) || r2.raw || JSON.stringify(r2.data||{},null,2));
+      $('#out0').textContent = parts.join('\n');
+      $('#exec0').textContent = 'Exécuter';
+      log('Détection module + statut HSM exécutés.', 'text-green-700');
+    }
+    async function execList() { $('#execList').textContent = 'Exécution…'; await listObjects(); $('#execList').textContent = 'Exécuter'; }
+    async function execPrivExtractAttempt() {
+      $('#execA').textContent = 'Exécution…';
+      const keyid = ($('#keyid').value||'').trim() || '01';
+      const pin = ($('#pin').value||'').trim();
+      if (!/^\d{6,15}$/.test(pin)) { log('PIN invalide (6–15 chiffres).', 'text-red-700'); $('#execA').textContent='Exécuter'; return; }
+      const r = await api('/api/pkcs11/privkey-attempt', {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ id:keyid, pin })
+      });
+      if (r.ok) {
+        $('#outA').textContent = r.data?.stdout || r.raw || '(ok)';
+      } else {
+        const msg = r.data?.error || `HTTP ${r.status}`;
+        $('#outA').textContent = `Pas d’endpoint côté serveur pour tenter l’extraction de clé privée.\n`+
+          `Attendu: échec sécurisé (CKR_ATTRIBUTE_SENSITIVE/CKR_ATTRIBUTE_VALUE_INVALID).\n`+
+          `Message: ${msg}`;
+      }
+      $('#execA').textContent = 'Exécuter';
+    }
+    async function execPubkey() {
+      $('#execB').textContent = 'Exécution…';
+      const keyid = ($('#keyid').value||'').trim() || '01';
+      const pin = ($('#pin').value||'').trim();
+      if (!/^\d{6,15}$/.test(pin)) { log('PIN invalide (6–15 chiffres).', 'text-red-700'); $('#execB').textContent='Exécuter'; return; }
+      const r = await api(`/api/pkcs11/pubkey?id=${encodeURIComponent(keyid)}&pin=${encodeURIComponent(pin)}`);
+      if (r.ok && r.data?.der_base64) {
+        const pem = b64ToPemPub(r.data.der_base64);
+        $('#outB').textContent = pem;
+        log('Clé publique récupérée (DER→PEM).', 'text-green-700');
+      } else {
+        $('#outB').textContent = `Erreur: ${r.data?.error || r.status}`;
+      }
+      $('#execB').textContent = 'Exécuter';
+    }
+    async function execSignRSA() {
+      $('#execCRSA').textContent = 'Exécution…';
+      const pin = ($('#pin').value||'').trim();
+      const keyid = ($('#keyid').value||'').trim() || '01';
+      if (!/^\d{6,15}$/.test(pin)) { log('PIN invalide (6–15 chiffres).', 'text-red-700'); $('#execCRSA').textContent='Exécuter'; return; }
+      const r = await api('/api/pkcs11/sign', {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ id:keyid, pin, mechanism:'SHA256-RSA-PKCS', message:'Bonjour FintraX' })
+      });
+      if (r.ok) {
+        const hex = r.data?.signatureHex || null;
+        $('#outCRSA').textContent = hex ? `Signature (hex):\n${hex}` : (r.data?.stdout || r.raw || '(ok)');
+      } else {
+        const msg = r.data?.error || `HTTP ${r.status}`;
+        $('#outCRSA').textContent = `Endpoint /api/pkcs11/sign manquant (ou erreur).\nMessage: ${msg}`;
+      }
+      $('#execCRSA').textContent = 'Exécuter';
+    }
+    async function execSignEC() {
+      $('#execCEC').textContent = 'Exécution…';
+      const pin = ($('#pin').value||'').trim();
+      const keyid = ($('#keyid').value||'').trim() || '01';
+      if (!/^\d{6,15}$/.test(pin)) { log('PIN invalide (6–15 chiffres).', 'text-red-700'); $('#execCEC').textContent='Exécuter'; return; }
+      const r = await api('/api/pkcs11/sign', {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ id:keyid, pin, mechanism:'ECDSA-SHA256', message:'Bonjour FintraX (ECDSA)' })
+      });
+      if (r.ok) {
+        const hex = r.data?.signatureHex || null;
+        $('#outCEC').textContent = hex ? `Signature (hex):\n${hex}` : (r.data?.stdout || r.raw || '(ok)');
+      } else {
+        const msg = r.data?.error || `HTTP ${r.status}`;
+        $('#outCEC').textContent = `Endpoint /api/pkcs11/sign manquant (ou erreur).\nMessage: ${msg}`;
+      }
+      $('#execCEC').textContent = 'Exécuter';
+    }
+    async function execMechanisms() {
+      $('#execM').textContent = 'Exécution…';
+      const r = await api('/api/pkcs11/mechanisms');
+      $('#outM').textContent = r.ok ? (r.data?.stdout || r.raw || '(ok)') : `Erreur: ${r.data?.error || r.status}`;
+      $('#execM').textContent = 'Exécuter';
+    }
+
+    function valOrDefault(v, d){ return (v && v.trim()) ? v.trim() : d; }
+    function mkCmds() {
+      const modulePath = valOrDefault($('#modulePath')?.value, DETECTED_MODULE);
+      const pin        = valOrDefault($('#pin')?.value, '123456');
+      const keyid      = valOrDefault($('#keyid')?.value, '01');
+      const header = [
+        '##### 0) Variables (adapter si besoin)',
+        `export PKCS11_MODULE=${modulePath}`,
+        `export PIN=${pin}`,
+        '',
+        '##### 1) Le HSM est bien vu par OpenSC/PKCS#11',
+        'pkcs11-tool --module "$PKCS11_MODULE" -L',
+        'sc-hsm-tool -S',
+        '',
+        '##### 2) Lister les objets présents sur le token',
+        'pkcs11-tool --module "$PKCS11_MODULE" --login --login-type user --pin "$PIN" -O',
+        'export KEYID=' + keyid,
+      ].join('\n');
+      const blockA = [
+        '### A) Vérifier qu’on ne peut pas extraire la clé privée',
+        'pkcs11-tool --module "$PKCS11_MODULE" --login --pin "$PIN" \\',
+        '  --read-object --type privkey --id "$KEYID" --output-file priv.der || true',
+        '# Attendu: CKR_ATTRIBUTE_SENSITIVE / CKR_ATTRIBUTE_VALUE_INVALID'
+      ].join('\n');
+      const blockB = [
+        '### B) Récupérer la clé publique et la lire avec OpenSSL',
+        'pkcs11-tool --module "$PKCS11_MODULE" --login --pin "$PIN" \\',
+        '  --read-object --type pubkey --id "$KEYID" --output-file pubkey.der',
+        'openssl pkey -pubin -inform DER -in pubkey.der -out pubkey.pem',
+        'openssl pkey -pubin -in pubkey.pem -text -noout'
+      ].join('\n');
+      const blockC_RSA = [
+        '### C) Signer dans le HSM (RSA) puis vérifier avec OpenSSL',
+        'echo "Bonjour FintraX" > msg.txt',
+        'pkcs11-tool --module "$PKCS11_MODULE" --login --pin "$PIN" \\',
+        '  --sign --mechanism SHA256-RSA-PKCS --id "$KEYID" \\',
+        '  --input-file msg.txt --output-file sig.bin',
+        'openssl dgst -sha256 -verify pubkey.pem -signature sig.bin msg.txt # "Verified OK" attendu'
+      ].join('\n');
+      const blockC_EC = [
+        '### C’) Signer dans le HSM (ECDSA) puis vérifier',
+        'echo "Bonjour FintraX (ECDSA)" > msg_ec.txt',
+        'pkcs11-tool --module "$PKCS11_MODULE" --login --pin "$PIN" \\',
+        '  --sign --mechanism ECDSA-SHA256 --id "$KEYID" \\',
+        '  --input-file msg_ec.txt --output-file sig_ec.bin',
+        'openssl dgst -sha256 -verify pubkey.pem -signature sig_ec.bin msg_ec.txt # "Verified OK" attendu'
+      ].join('\n');
+      const blockM = [
+        '### D) Mécanismes supportés',
+        'pkcs11-tool --module "$PKCS11_MODULE" -M | egrep \'RSA|ECDSA|SHA256\'',
+        '',
+        '### E) Infos PKCS#15 / SmartCard-HSM',
+        'pkcs15-tool --dump',
+        'sc-hsm-tool --list'
+      ].join('\n');
+      return { header, blockA, blockB, blockC_RSA, blockC_EC, blockM };
+    }
+    function putCommands() {
+      const { header, blockA, blockB, blockC_RSA, blockC_EC, blockM } = mkCmds();
+      $('#cmd0').textContent = header;
+      $('#cmdA').textContent = blockA;
+      $('#cmdB').textContent = blockB;
+      $('#cmdCRSA').textContent = blockC_RSA;
+      $('#cmdCEC').textContent = blockC_EC;
+      $('#cmdM').textContent = blockM;
+    }
+    function copySel(sel) {
+      const el = $(sel); if (!el) return;
+      navigator.clipboard.writeText(el.textContent).then(()=> log('Bloc copié.', 'text-green-700'))
+        .catch(()=> log('Impossible de copier.', 'text-red-700'));
+    }
+    function downloadScript() {
+      const { header, blockA, blockB, blockC_RSA, blockC_EC, blockM } = mkCmds();
+      const content = [
+        '#!/usr/bin/env bash','set -euo pipefail',
+        header, '', blockA, '', blockB, '', blockC_RSA, '', blockC_EC, '', blockM, ''
+      ].join('\n');
+      const blob = new Blob([content], { type:'text/x-shellscript' });
+      const url  = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'fintrax-hsm-selftest.sh';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      log('Script généré: fintrax-hsm-selftest.sh', 'text-green-700');
+    }
+
+    window.addEventListener('DOMContentLoaded', async ()=>{
+      await detectModule();
+      putCommands();
+      $('#pin').addEventListener('input', putCommands);
+      $('#keyid').addEventListener('input', putCommands);
+      $('#modulePath').addEventListener('input', putCommands);
+    });
+  </script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+    <header class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">FintraX — Tests HSM (CLI + Exécution + Ollama)</h1>
+      <nav class="text-sm space-x-4">
+        <a href="/" class="text-blue-600 hover:underline">Accueil</a>
+        <a href="/diagnostic" class="text-blue-600 hover:underline">Diagnostic</a>
+      </nav>
+    </header>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+      <!-- LEFT: tests -->
+      <div class="lg:col-span-2 space-y-6">
+        <section class="bg-white rounded-xl shadow p-4 space-y-3">
+          <h2 class="font-medium">Paramètres</h2>
+          <div class="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-sm mb-1">Chemin module PKCS#11</label>
+              <input id="modulePath" class="w-full border rounded px-3 py-2" placeholder="/usr/local/lib/libsc-hsm-pkcs11.so">
+            </div>
+            <div>
+              <label class="block text-sm mb-1">PIN utilisateur (6–15 chiffres)</label>
+              <input id="pin" type="password" inputmode="numeric" class="w-full border rounded px-3 py-2" placeholder="123456">
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Key ID (ex: 01)</label>
+              <input id="keyid" class="w-full border rounded px-3 py-2" placeholder="01">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-run" onclick="listObjects()">📚 Lister objets (via API)</button>
+            <button class="btn btn-alt" onclick="downloadScript()">⬇️ Télécharger le script</button>
+          </div>
+          <details class="mt-3">
+            <summary class="text-sm text-slate-600">Sortie /api/pkcs11/objects</summary>
+            <pre id="objectsOut" class="code"></pre>
+          </details>
+        </section>
+
+        <section class="bg-white rounded-xl shadow p-4 space-y-6">
+          <div class="flex items-center justify-between">
+            <h2 class="font-medium">Blocs de commandes & Exécution</h2>
+            <p class="text-xs text-slate-500">Les blocs utilisent les champs ci-dessus (module, PIN, KEYID).</p>
+          </div>
+
+          <!-- 0–2) Détection & listing -->
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="font-medium">0–2) Détection & listing</h3>
+              <div class="space-x-2">
+                <button id="exec0"  class="btn btn-run"  onclick="execDetect()">Exécuter</button>
+                <button class="btn btn-oll" onclick="analyzeWithOllama($('#out0').textContent||'', 'Analyse détection')">💬 Expliquer avec Ollama</button>
+                <button class="btn btn-copy" onclick="copySel('#cmd0')">Copier</button>
+              </div>
+            </div>
+            <pre id="cmd0"  class="code"></pre>
+            <details class="mt-2">
+              <summary class="text-sm text-slate-600">Sortie</summary>
+              <pre id="out0" class="code"></pre>
+            </details>
+          </div>
+
+          <!-- A) Non-extractibilité -->
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="font-medium">A) Non-extractibilité de la clé privée</h3>
+              <div class="space-x-2">
+                <button id="execA" class="btn btn-warn" onclick="execPrivExtractAttempt()">Exécuter</button>
+                <button class="btn btn-oll" onclick="analyzeWithOllama($('#outA').textContent||'', 'Analyse non-extractibilité')">💬 Expliquer avec Ollama</button>
+                <button class="btn btn-copy" onclick="copySel('#cmdA')">Copier</button>
+              </div>
+            </div>
+            <pre id="cmdA" class="code"></pre>
+            <p class="text-xs muted mt-1">Attendu: échec sécurisé côté HSM (clé marquée sensitive/non-extractible).</p>
+            <details class="mt-2">
+              <summary class="text-sm text-slate-600">Sortie</summary>
+              <pre id="outA" class="code"></pre>
+            </details>
+          </div>
+
+          <!-- B) Export clé publique -->
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="font-medium">B) Export clé publique & lecture (OpenSSL)</h3>
+              <div class="space-x-2">
+                <button id="execB" class="btn btn-run" onclick="execPubkey()">Exécuter</button>
+                <button class="btn btn-oll" onclick="analyzeWithOllama($('#outB').textContent||'', 'Analyse clé publique')">💬 Expliquer avec Ollama</button>
+                <button class="btn btn-copy" onclick="copySel('#cmdB')">Copier</button>
+              </div>
+            </div>
+            <pre id="cmdB" class="code"></pre>
+            <details class="mt-2">
+              <summary class="text-sm text-slate-600">Sortie (PEM)</summary>
+              <pre id="outB" class="code"></pre>
+            </details>
+          </div>
+
+          <!-- C) Signature RSA -->
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="font-medium">C) Signature RSA dans le HSM + vérification</h3>
+              <div class="space-x-2">
+                <button id="execCRSA" class="btn btn-run" onclick="execSignRSA()">Exécuter</button>
+                <button class="btn btn-oll" onclick="analyzeWithOllama($('#outCRSA').textContent||'', 'Analyse signature RSA')">💬 Expliquer avec Ollama</button>
+                <button class="btn btn-copy" onclick="copySel('#cmdCRSA')">Copier</button>
+              </div>
+            </div>
+            <pre id="cmdCRSA" class="code"></pre>
+            <details class="mt-2">
+              <summary class="text-sm text-slate-600">Sortie</summary>
+              <pre id="outCRSA" class="code"></pre>
+            </details>
+          </div>
+
+          <!-- C’) Signature ECDSA -->
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="font-medium">C’) Signature ECDSA dans le HSM + vérification</h3>
+              <div class="space-x-2">
+                <button id="execCEC" class="btn btn-run" onclick="execSignEC()">Exécuter</button>
+                <button class="btn btn-oll" onclick="analyzeWithOllama($('#outCEC').textContent||'', 'Analyse signature ECDSA')">💬 Expliquer avec Ollama</button>
+                <button class="btn btn-copy" onclick="copySel('#cmdCEC')">Copier</button>
+              </div>
+            </div>
+            <pre id="cmdCEC" class="code"></pre>
+            <details class="mt-2">
+              <summary class="text-sm text-slate-600">Sortie</summary>
+              <pre id="outCEC" class="code"></pre>
+            </details>
+          </div>
+
+          <!-- D/E) Mécanismes & infos -->
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="font-medium">D/E) Mécanismes & infos PKCS#15</h3>
+              <div class="space-x-2">
+                <button id="execM" class="btn btn-run" onclick="execMechanisms()">Exécuter</button>
+                <button class="btn btn-oll" onclick="analyzeWithOllama($('#outM').textContent||'', 'Analyse mécanismes')">💬 Expliquer avec Ollama</button>
+                <button class="btn btn-copy" onclick="copySel('#cmdM')">Copier</button>
+              </div>
+            </div>
+            <pre id="cmdM" class="code"></pre>
+            <details class="mt-2">
+              <summary class="text-sm text-slate-600">Sortie</summary>
+              <pre id="outM" class="code"></pre>
+            </details>
+          </div>
+        </section>
+      </div>
+
+      <!-- RIGHT: Ollama panel -->
+      <aside class="space-y-4">
+        <section class="bg-white rounded-xl shadow p-4">
+          <h2 class="font-medium mb-2">Interprétation par Ollama</h2>
+          <p class="text-xs text-slate-500 mb-2">Analyse toutes les sorties des tests ci-contre.</p>
+          <div class="flex gap-2 mb-2">
+            <button class="btn btn-oll" onclick="analyzeWithOllama(collectAllOutputs(), 'Analyse globale')">💬 Analyser tout</button>
+            <button class="btn btn-copy" onclick="navigator.clipboard.writeText(collectAllOutputs())">Copier tout le contexte</button>
+          </div>
+          <div id="ollamaStatus" class="text-xs text-slate-600 mb-2">Prêt</div>
+          <pre id="ollamaOut" class="code" style="min-height: 280px;"></pre>
+        </section>
+
+        <section class="bg-white rounded-xl shadow p-4">
+          <h2 class="font-medium mb-2">Journal</h2>
+          <div id="log" class="space-y-1 text-sm font-mono whitespace-pre-wrap"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

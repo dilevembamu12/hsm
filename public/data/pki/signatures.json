@@ -1,0 +1,21 @@
+{
+  "total": 1,
+  "items": [
+    {
+      "id": "2fc4c97d378dc8390cf29107",
+      "ts": "2025-10-02T17:04:31.512Z",
+      "document": "signed-9715227623ffe2388d025189.txt",
+      "inputSize": 1117,
+      "mimeType": "text/plain",
+      "status": "valid",
+      "algorithm": "RSA-2048",
+      "certificateId": "ac896cc7a8ceb7793beed085",
+      "includeTimestamp": true,
+      "visibleSignature": false,
+      "padesSignature": false,
+      "outputPath": "/home/pki/public/data/mtn/signed-2fc4c97d378dc8390cf29107.txt",
+      "outputName": "signed-2fc4c97d378dc8390cf29107.txt",
+      "downloadUrl": "/downloads/signatures/2fc4c97d378dc8390cf29107"
+    }
+  ]
+}

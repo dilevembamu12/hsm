@@ -1,0 +1,532 @@
+Complete Directory Structure:
+
+└── ./
+    ├── app
+    │   ├── config
+    │   │   ├── channels.js ✓
+    │   │   ├── database.js ✓
+    │   │   ├── env.js ✓
+    │   │   ├── index.js ✓
+    │   │   └── security.js ✓
+    │   ├── controllers
+    │   │   ├── authController.js ✓
+    │   │   ├── dashboardController.js ✓
+    │   │   ├── entityController.js ✓
+    │   │   ├── entityTypeController.js ✓
+    │   │   ├── formController.js ✓
+    │   │   ├── formTemplateController.js ✓
+    │   │   ├── kycController.js ✓
+    │   │   ├── logController.js ✓
+    │   │   ├── maskTemplateController.js ✓
+    │   │   ├── n8nWebhookController.js ✓
+    │   │   ├── permissionController.js ✓
+    │   │   ├── publicFormController.js ✓
+    │   │   ├── roleController.js ✓
+    │   │   ├── royaltyResultController.js ✓
+    │   │   ├── royaltyRulesController.js ✓
+    │   │   ├── settingsController.js ✓
+    │   │   ├── statementController.js ✓
+    │   │   ├── statementGroupController.js ✓
+    │   │   ├── statementManualTempController.js ✓
+    │   │   └── userController.js ✓
+    │   ├── db
+    │   │   ├── migrations
+    │   │   │   ├── 20250527100222-create-roles.js ✓
+    │   │   │   ├── 20250527100246-create-entity-types.js ✓
+    │   │   │   ├── 20250527100301-create-entities.js ✓
+    │   │   │   ├── 20250527100303-create-user.js ✓
+    │   │   │   ├── 20250527111137-create-role.js ✓
+    │   │   │   ├── 20250527113232-create-kyc.js ✓
+    │   │   │   ├── 20250527114646-create-user-roles.js ✓
+    │   │   │   ├── 20250529223317-create-fiscal-rule.js ✓
+    │   │   │   ├── 20250529224011-create-mask-template.js ✓
+    │   │   │   ├── 20250529224012-create-form-template.js ✓
+    │   │   │   ├── 20250531112222-create-form-template-entity-type.js ✓
+    │   │   │   ├── 20250602093651-create-statement-manual-temps.js ✓
+    │   │   │   ├── 20250605160003-create-statement-group.js ✓
+    │   │   │   ├── 20250605160004-create-statement.js ✓
+    │   │   │   ├── 20250610131047-create-log.js ✓
+    │   │   │   ├── 20250619124200-add-update_data-to-log-action-enum.js ✓
+    │   │   │   ├── 20250619132136-add-zone-to-statements.js ✓
+    │   │   │   ├── 20250619132830-change-action-type-in-logs.js ✓
+    │   │   │   ├── 20250620123359-create-royalty-rules.js ✓
+    │   │   │   ├── 20250620123416-create-royalty-result.js ✓
+    │   │   │   ├── 20250620123417-create-royalty-calculation-logs.js ✓
+    │   │   │   ├── 20250624105231-add-fieldMappings-to-mask-templates.js ✓
+    │   │   │   ├── 20250624105240-add-rejected-to-royalty-result-status-enum.js ✓
+    │   │   │   ├── 20250626172158-create-royalty-calculation-group.js ✓
+    │   │   │   ├── 20250626173221-add-royaltyCalculationGroupId-to-RoyaltyResult.js ✓
+    │   │   │   ├── 20250629173252-add_geolocation_and_contact_to_entity.js ✓
+    │   │   │   ├── 20250704114141-add-rolesData-to-User.js ✓
+    │   │   │   ├── 20250707115459-create-permission.js ✓
+    │   │   │   ├── 20250707120100-create-role-permission.js ✓
+    │   │   │   ├── 20250707120150-add-description-to-role.js ✓
+    │   │   │   ├── 20250709121604-add-PhoneNumber-To-Users copy.js ✓
+    │   │   │   ├── 20250709121804-add-originalData-To-statementManualTemp.js ✓
+    │   │   │   ├── 20250711151726-addMonthYearToStatementManualTemps.js ✓
+    │   │   │   ├── 20250712133416-add-taxeType-to-statementManualTemp.js ✓
+    │   │   │   ├── 20250712141549-add-tax-period-to-statement-group.js ✓
+    │   │   │   ├── 20250715151731-add-RoyaltyCalculationGroupId-To-RoyaltyCalculationLogs.js ✓
+    │   │   │   └── 20250728124217-add-declareDate-to-StatementManualTemp.js ✓
+    │   │   └── seeders
+    │   │       ├── 20250527100822-roles-seeder.js ✓
+    │   │       ├── 20250527100823-entity-types-seeder.js ✓
+    │   │       ├── 20250527100825--entities-seeder.js copy.js ✓
+    │   │       ├── 20250527100825--entities-seeder.js.js ✓
+    │   │       ├── 20250527100825-super-admin-seeder.js ✓
+    │   │       ├── 20250527101258-kyc-seeder.js.js ✓
+    │   │       ├── 20250527105100-create-entities.js ✓
+    │   │       ├── 20250527105105-create-artf-users.js ✓
+    │   │       ├── 20250527105900-create-entities.js.js ✓
+    │   │       ├── 20250527105901-create-mask-templates.js ✓
+    │   │       ├── 20250527105902-create-form-templates.js ✓
+    │   │       ├── 20250707121741-permissions-seeder.js ✓
+    │   │       ├── 20250707121745-custom-permissions-seeder.js ✓
+    │   │       └── 20250707124635-assign-admin-permissions-seeder.js ✓
+    │   ├── locales
+    │   │   ├── en.json ✓
+    │   │   └── fr.json ✓
+    │   ├── middlewares
+    │   │   ├── validators
+    │   │   │   ├── authValidator.js ✓
+    │   │   │   ├── dashboardValidator.js ✓
+    │   │   │   ├── entityTypeValidator.js ✓
+    │   │   │   ├── entityValidator.js ✓
+    │   │   │   ├── formTemplateValidator.js ✓
+    │   │   │   ├── formValidator.js ✓
+    │   │   │   ├── kycValidator.js ✓
+    │   │   │   ├── maskTemplateValidator.js ✓
+    │   │   │   ├── publicFormValidator.js ✓
+    │   │   │   ├── roleValidator.js ✓
+    │   │   │   ├── royaltyResultValidator.js ✓
+    │   │   │   ├── royaltyRuleValidator.js ✓
+    │   │   │   ├── settingsValidator.js ✓
+    │   │   │   ├── statementGroupValidator.js ✓
+    │   │   │   ├── statementManualTempValidator.js ✓
+    │   │   │   ├── statementValidator.js ✓
+    │   │   │   └── userValidator.js ✓
+    │   │   ├── apiAuthMiddleware.js ✓
+    │   │   ├── authMiddleware.js ✓
+    │   │   ├── entityMiddleware.js ✓
+    │   │   ├── error.js ✓
+    │   │   ├── formMiddleware.js ✓
+    │   │   ├── formTemplateMiddleware.js ✓
+    │   │   ├── handleValidationErrors.js ✓
+    │   │   ├── kycMiddleware.js ✓
+    │   │   ├── logMiddleware.js ✓
+    │   │   ├── maskTemplateMiddleware.js ✓
+    │   │   ├── roleMiddleware.js ✓
+    │   │   ├── royaltyResultMiddleware.js ✓
+    │   │   ├── royaltyRule.js ✓
+    │   │   ├── settingsMiddleware.js ✓
+    │   │   ├── statementGroupMiddleware.js ✓
+    │   │   ├── statementManualTempMiddleware.js ✓
+    │   │   ├── statementMiddleware.js ✓
+    │   │   └── userMiddleware.js ✓
+    │   ├── models
+    │   │   ├── entity.js ✓
+    │   │   ├── entitytype.js ✓
+    │   │   ├── fiscalrule.js ✓
+    │   │   ├── formtemplate.js ✓
+    │   │   ├── formtemplateentitytype.js ✓
+    │   │   ├── index.js ✓
+    │   │   ├── kyc.js ✓
+    │   │   ├── log.js ✓
+    │   │   ├── masktemplate.js ✓
+    │   │   ├── permission.js ✓
+    │   │   ├── role.js ✓
+    │   │   ├── rolepermission.js ✓
+    │   │   ├── RoyaltyCalculationGroup.js ✓
+    │   │   ├── royaltyCalculationLog.js ✓
+    │   │   ├── royaltyResult.js ✓
+    │   │   ├── royaltyRule.js ✓
+    │   │   ├── statement.js ✓
+    │   │   ├── statementgroup.js ✓
+    │   │   ├── statementmanualtemps.js ✓
+    │   │   ├── user.js ✓
+    │   │   └── userrole.js ✓
+    │   ├── routes
+    │   │   ├── api
+    │   │   │   ├── authApiRoutes.js ✓
+    │   │   │   ├── kycApiRoutes.js ✓
+    │   │   │   ├── maskTemplateApiRoutes.js ✓
+    │   │   │   ├── n8nWebhookRoutes.js ✓
+    │   │   │   ├── royaltyResultRoutes.js ✓
+    │   │   │   ├── royaltyRuleRoutes.js ✓
+    │   │   │   ├── statementApiRoutes.js ✓
+    │   │   │   ├── statementGroupApiRoutes.js ✓
+    │   │   │   └── statementManualTempApiRoutes.js ✓
+    │   │   ├── web
+    │   │   │   ├── authWebRoutes.js ✓
+    │   │   │   ├── dashboardWebRoutes.js ✓
+    │   │   │   ├── entityTypeWebRoutes.js ✓
+    │   │   │   ├── entityWebRoutes.js ✓
+    │   │   │   ├── formTemplatesWebRoutes.js ✓
+    │   │   │   ├── formWebRoutes.js ✓
+    │   │   │   ├── logWebRoutes.js ✓
+    │   │   │   ├── maskTemplateWebRoutes.js ✓
+    │   │   │   ├── publicFormWebRoutes.js ✓
+    │   │   │   ├── roleWebRoutes.js ✓
+    │   │   │   ├── royaltyResultWebRoutes.js ✓
+    │   │   │   ├── royaltyRulesRoutes.js ✓
+    │   │   │   ├── royaltyRulesWebRoutes.js ✓
+    │   │   │   ├── settingsWebRoutes.js ✓
+    │   │   │   ├── statementGroupWebRoutes.js ✓
+    │   │   │   ├── statementManualTempWebRoutes.js ✓
+    │   │   │   ├── statementWebRoutes.js ✓
+    │   │   │   └── userWebRoutes.js ✓
+    │   │   └── index.js ✓
+    │   ├── services
+    │   │   ├── authService.js ✓
+    │   │   ├── dataIntegrationService.js ✓
+    │   │   ├── entityService.js ✓
+    │   │   ├── formService.js ✓
+    │   │   ├── iaService.js ✓
+    │   │   ├── kycService.js ✓
+    │   │   ├── MaskTemplateService.js ✓
+    │   │   ├── notificationService.js ✓
+    │   │   ├── ocrService.js ✓
+    │   │   ├── royaltyCalculationService.js ✓
+    │   │   ├── statementService.js ✓
+    │   │   └── userService.js ✓
+    │   ├── storage
+    │   │   ├── locations.json ✓
+    │   │   └── roles.json ✓
+    │   ├── utils
+    │   │   ├── dataFormatter.js ✓
+    │   │   ├── excelProcessor copy.js ✓
+    │   │   ├── excelProcessor.js ✓
+    │   │   ├── ExcelUtil.js ✓
+    │   │   ├── fileUploader.js ✓
+    │   │   ├── hash.js ✓
+    │   │   ├── jwt.js ✓
+    │   │   ├── modelFields.js ✓
+    │   │   ├── n8nClient.js ✓
+    │   │   └── validation.js ✓
+    │   └── views
+    │       └── maskTemplates
+    │           └── partials
+    │               └── scripts
+    │                   └── maskFieldManagement.js ✓
+    ├── n8n
+    │   ├── workflows
+    │   │   ├── anomaly_detection.json ✓
+    │   │   ├── data_classification.json ✓
+    │   │   ├── declaration_notification.json ✓
+    │   │   ├── ocr_document_processing.json ✓
+    │   │   └── sftp_ftp_data_ingestion.json ✓
+    │   └── Dockerfile ✓
+    ├── .gitignore ✓
+    ├── .gitlab-ci.yml ✓
+    ├── app.js ✓
+    ├── Dockerfile ✓
+    ├── package.json ✓
+    └── README.md ✓
+
+
+
+--- .gitlab-ci.yml ---
+
+stages:
+  - trigger
+
+trigger_ci_cd_pipeline:
+  stage: trigger
+  script:
+    - |
+      echo "🎯 Déclenchement du pipeline dans le repo CI/CD... ici TOKEN = $CI_CD_TRIGGER_TOKEN"
+      curl -X POST \
+        -F token=$CI_CD_TRIGGER_TOKEN \
+        -F ref=main \
+        https://gitlab.com/api/v4/projects/70810841/trigger/pipeline
+  only:
+    - main
+
+--- app.js ---
+
+// app.js
+require('dotenv').config();
+
+// Override juste les variables de BDD si présentes dans l'env (par GitLab CI ou Docker)
+if (process.env.NODE_ENV === 'production') {
+    console.log('Overriding DB variables with environment values...');
+    if (process.env.OVERRIDE_BD_HOST) process.env.DB_HOST = process.env.OVERRIDE_BD_HOST;
+    if (process.env.OVERRIDE_BD_USER) process.env.DB_USER = process.env.OVERRIDE_BD_USER;
+    if (process.env.OVERRIDE_BD_PWD) process.env.DB_PASSWORD = process.env.OVERRIDE_BD_PWD;
+    if (process.env.OVERRIDE_BD_NAME) process.env.DB_NAME = process.env.OVERRIDE_BD_NAME;
+
+    //console.log(process.env.DB_HOST, process.env.DB_USER, process.env.DB_PWD, process.env.DB_NAME);
+}
+// FIN D'OVERRIDE
+
+const ENV = require('./app/config');
+
+//console.log(process.env.DB_HOST, process.env.DB_USER, process.env.DB_PWD, process.env.DB_NAME);
+
+
+const express = require('express');
+const path = require('path');
+
+
+var logger = require('morgan');
+const session = require('express-session');
+const flash = require('connect-flash');
+const methodOverride = require('method-override');
+
+const i18n = require('i18n'); // Importation de i18n
+// NOUVEAU: Importez cookie-parser et csurf
+const cookieParser = require('cookie-parser');
+const csurf = require('csurf');
+const multer = require('multer');
+
+const expressLayouts = require('express-ejs-layouts');
+
+const bodyParser = require('body-parser')
+const cors = require('cors');
+const { readFileSync } = require('fs');
+
+const app = express();
+
+const PORT = ENV.PORT || 3000;
+
+app.use(bodyParser.json({ limit: '100mb', extended: true })) //je met 100Mb pour prendre en charge les fichiers excel plus large
+app.use(bodyParser.urlencoded({ limit: '100mb', extended: true })) //je met 100Mb pour prendre en charge les fichiers excel plus large
+//app.use(bodyParser.urlencoded({ limit: '100mb', extended: true }));
+//app.use(bodyParser.json());
+
+
+
+app.use(cors())
+app.use(cookieParser());
+
+const { isAuthenticated } = require('./app/middlewares/authMiddleware');
+
+
+
+
+// --- Configuration i18n (Internationalisation) ---
+i18n.configure({
+    locales: ['fr', 'en'], // Langues supportées
+    defaultLocale: 'fr',   // Langue par défaut
+    cookie: 'lang',        // Nom du cookie pour stocker la langue
+    directory: path.join(__dirname, 'app', 'locales'), // Chemin vers le dossier des fichiers de traduction
+    objectNotation: true, // Permet d'utiliser des objets imbriqués pour les traductions
+    syncFiles: true,      // Crée les fichiers de traduction si non existants
+    updateFiles: true,    // Met à jour les fichiers de traduction avec les clés manquantes
+    //autoReload: process.env.NODE_ENV !== 'production', // Recharger les fichiers de traduction en dev
+    /*
+    logWarnFn: function (msg) { // <-- AJOUTEZ CETTE LIGNE OU SIMPLEMENT 'logWarnFn: console.warn'
+        console.warn('i18n warning:', msg);
+    }
+    */
+    register: "req", // Attacher __ à l'objet req (souvent préférable pour un accès contextuel)
+    syncFiles: true, // Crée les fichiers de locale manquants
+    register: global // Rend les fonctions comme __(), __n(), getLocale disponibles globalement
+    // Ou sur req/res si vous ne voulez pas de global (optionnel, selon la bibliothèque)
+});
+
+
+
+
+
+
+/*
+app.use(logger('dev'));
+
+
+app.use(express.json());
+app.use(bodyParser.json()); // support json encoded bodies
+app.use(express.urlencoded({ extended: true }));
+app.use(methodOverride('_method'));
+
+app.use(cors())
+app.use(cookieParser());
+*/
+
+
+
+
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your_super_secret_session_key',
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        secure: false /*process.env.NODE_ENV === 'production'*/,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 10000
+    }
+}));
+app.use(flash());
+app.use(i18n.init); // Initialise i18n comme middleware
+
+
+// NOUVEAU MIDDLEWARE : Empêche les messages flash en double et gère le nettoyage
+app.use((req, res, next) => {
+    // Sauvegarde une référence à la fonction flash originale
+    const originalFlash = req.flash;
+
+
+    // Surcharge la fonction req.flash
+    req.flash = function (type, msg) {
+        // 1. Si 'msg' est undefined, c'est un appel pour récupérer les messages (getter).
+        // On passe à la fonction originale qui gère cela et vide les messages.
+        if (msg === undefined) {
+            return originalFlash.call(this, type);
+        }
+
+        // 2. Si 'msg' est null ou un tableau vide, c'est une instruction pour VIDER les messages.
+        // La façon la plus sûre de vider est d'appeler la fonction originale en mode getter,
+        // ce qui supprime les messages de la session.
+        if (msg === null || (Array.isArray(msg) && msg.length === 0)) {
+            originalFlash.call(this, type); // Appelle la fonction originale comme un getter pour vider
+            return []; // Retourne un tableau vide pour indiquer que les messages ont été vidés
+        }
+
+        // 3. Si 'msg' est défini et non pour vider, c'est un appel pour DÉFINIR un ou plusieurs messages.
+        // Récupère les messages flash existants pour ce type (sans les vider) pour la déduplication.
+        // Ajout d'une vérification robuste pour s'assurer que req.session et req.session.flash existent.
+        const existingMessages = (req.session && req.session.flash && Array.isArray(req.session.flash[type]))
+            ? req.session.flash[type]
+            : [];
+        let messagesToActuallyAdd = [];
+
+        if (Array.isArray(msg)) {
+            // Si 'msg' est un tableau de messages, filtre ceux qui sont déjà présents
+            messagesToActuallyAdd = msg.filter(m => !existingMessages.includes(m));
+        } else {
+            // Si 'msg' est un seul message, l'ajoute seulement s'il n'est pas déjà présent
+            if (!existingMessages.includes(msg)) {
+                messagesToActuallyAdd.push(msg);
+            }
+        }
+
+        // Appelle la fonction flash originale seulement s'il y a de nouveaux messages uniques à ajouter
+        if (messagesToActuallyAdd.length > 0) {
+            return originalFlash.call(this, type, messagesToActuallyAdd);
+        }
+
+        // Si aucun nouveau message unique n'a été ajouté, retourne un tableau vide
+        return [];
+    };
+    next();
+});
+
+
+
+
+
+// 3. Utilisez csurf APRÈS cookie-parser et express-session
+// L'option { cookie: true } signifie que le jeton CSRF est stocké dans un cookie.
+//app.use(csurf({ cookie: true }));
+
+
+// NOUVEAU MIDDLEWARE : Gère les redirections basées sur l'authentification et l'URL.
+// Ce middleware doit être placé APRES l'initialisation de 'session' et 'flash',
+// mais AVANT la définition de vos routes principales (app.use('/dashboard', ...), etc.)
+
+app.use(isAuthenticated, (req, res, next) => {
+    // Assumons que req.authUser est défini par un middleware d'authentification précédent
+    // (par ex., après décodage d'un JWT ou chargement de l'utilisateur basé sur la session).
+    // Si votre application utilise une autre propriété (ex: req.user, req.session.userId),
+    // ajustez la condition `!req.authUser` en conséquence.
+    const rolesData = JSON.parse(readFileSync('./app/storage/roles.json'));
+
+    res.rolesData = rolesData;
+    req.rolesData = rolesData;
+    const isRoot = req.originalUrl.startsWith('/') && req.originalUrl.endsWith('/') && req.originalUrl == "/";
+    const isAuthRoute = req.originalUrl.startsWith('/auth') || req.originalUrl.startsWith('/login');
+    const isPublicFormRoute = req.originalUrl.startsWith('/public');
+    const isApiRoute = req.originalUrl.startsWith('/api');
+    // Une vérification simple pour les assets statiques. express.static gère généralement cela avant.
+    // Cette vérification est une sécurité si des requêtes directes aux assets passent par ici.
+    const isStaticAsset = req.originalUrl.includes('.') && (req.originalUrl.startsWith('/assets/') || req.originalUrl.startsWith('/css/') || req.originalUrl.startsWith('/js/') || req.originalUrl.startsWith('/img/'));
+    //console.log(req.originalUrl,isStaticAsset)
+
+
+    // Les requêtes API et les assets statiques ne sont pas affectés par cette logique de redirection web.
+    if (isRoot) {
+        return res.redirect(req.session.returnTo || '/dashboard');
+    }
+
+    // Les requêtes API et les assets statiques ne sont pas affectés par cette logique de redirection web.
+    if (isApiRoute || isStaticAsset) {
+        return next();
+    }
+
+
+    if (!req.authUser) { // L'utilisateur N'EST PAS authentifié
+        if (req.originalUrl === '/') {
+            // Si l'utilisateur non authentifié arrive à la racine, redirigez-le vers la page de connexion.
+            return res.redirect('/auth/login');
+        } else if (!isAuthRoute) {
+            // Si l'utilisateur non authentifié tente d'accéder à une page protégée
+            // (qui n'est ni /auth, ni /public, ni la racine),
+
+
+            // sauvegardez l'URL et redirigez vers la connexion.
+            req.session.returnTo = req.originalUrl;
+
+
+            req.flash('errorMessage', null);
+            req.flash('errorMessage', ('Veuillez vous connecter pour accéder à cette page.'));
+            return res.redirect('/auth/login');
+        }
+    } else { // L'utilisateur EST authentifié
+        if (req.originalUrl === '/' || req.originalUrl === '/auth/login') {
+            // Si l'utilisateur authentifié arrive à la racine ou à la page de connexion,
+            // redirigez-le directement vers le tableau de bord.
+            // Effacez toute URL de retour persistante si l'utilisateur est déjà connecté.
+            delete req.session.returnTo;
+            return res.redirect('/dashboard');
+        }
+    }
+
+
+    res.locals.messages = req.flash('messages');
+    res.locals.successMessage = req.flash('successMessage');
+    res.locals.successMessages = req.flash('success');
+    res.locals.errorMessage = req.flash('errorMessage');
+    res.locals.formErrors = req.flash('formErrors'); // Pour les erreurs de validation
+    res.locals.formData = req.flash('formData')[0]; // Pour repopuler le formulaire, flash retourne un tableau
+
+    // Ceci rend le jeton accessible dans EJS via locals.csrfToken
+    //res.locals.csrfToken = req.csrfToken();
+
+    // S'assurer que ces variables sont disponibles dans toutes les vues
+    res.locals.user = req.authUser; // Contient l'objet utilisateur décodé du JWT (ex: { id: ..., entityId: ... })
+    res.locals.userRoles = req.userRoles; // Contient le tableau des rôles (ex: ['super_admin'])
+    res.locals.hasPermission = req.hasPermission
+    res.locals.T = i18n
+    res.locals.req = req; // Pour accéder à req.flash
+    // Exemple de req.user (à remplacer par votre logique d'authentification réelle)
+    // req.user = { id: 1, role: 'super_admin' };
+
+
+    res.locals.title = i18n.__('FinTRAX');
+    res.locals.pageTitle = i18n.__('FinTRAX');
+    res.locals.pageDescription = i18n.__('FinTRAX Projet');
+
+    res.locals.googleMapsApiKey = ENV.GOOGLE_MAPS_API_KEY;
+
+    next(); // Passe au middleware suivant ou à la route si aucune redirection n'a eu lieu
+});
+
+
+
+// Ajoutez ceci APRÈS csurf
+
+
+// Gérer les erreurs CSRF spécifiquement (DOIT être après csurf, mais avant vos routes spécifiques si vous avez des routes sans CSRF)
+app.use((err, req, res, next) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+        console.error('Erreur CSRF Token:', err.message);
+        if (req.xhr || req.headers.accept.includes('application/json')) {
+            return res.status(403).json({ success: false, message: ('Jeton CSRF invalide. Veuillez réessayer.') });
+        }
+        req.flash('errorMessage', ('Jeton de sécurité invalide. Veuillez réessayer.'));
+        return res.redirect('back');
+    }
+    // Gérer les erreurs de Multer (taille de fichier, type de fichier)
+    if (err instanceof multer.MulterError) {
+        console.error('Multer Error:', err.message);
+        if (req.xhr || req.headers.accept

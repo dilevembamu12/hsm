@@ -1,1081 +1,1154 @@
-// pki.js - Gestion complète PKI avec persistance JSON
+/* pki.js - FIntraX PKI Manager (FR)
+ * 100% backend-driven: real HSM, real certificates, real signing & verification.
+ *
+ * Endpoints are taken from APP_CONFIG:
+ * - api.base (prefix)
+ * - api.pki.{certificates, generateCertificate, revokeCertificate, signatures, hsmStatus, dashboardStats, audit, signDocument, verifyDocument}
+ * - api.pkcs11.status (optional; falls back to /api/pkcs11/sc-hsm-status)
+ */
 
-// ---------- Configuration ----------
-const API_BASE = window.APP_CONFIG?.api?.base || '';
-const API_ENDPOINTS = window.APP_CONFIG?.api?.endpoints || {};
-const ERROR_MESSAGES = window.ERROR_MESSAGES || {};
+(function () {
+  'use strict';
 
-// ---------- État global de l'application ----------
-let appState = {
-    certificates: [],
-    users: [],
-    signatures: [],
-    auditLog: [],
-    hsmStatus: { 
-        connected: false, 
-        cardPresent: false,
-        lastCheck: null,
-        deviceInfo: null
-    },
-    currentTab: 'dashboard',
-    isLoading: false,
-    selectedFile: null,
-    filters: {
-        certificateStatus: 'all',
-        certificateType: 'all',
-        searchTerm: ''
+  // ---------------------------------
+  // Configuration & helpers
+  // ---------------------------------
+  var APP = window.APP_CONFIG || {};
+  var API = APP.api || {};
+  var PKI = API.pki || API.endpoints || {};
+  var PKCS11 = API.pkcs11 || {};
+  var API_BASE = (API.base || '');
+  var TIMEOUT = API.timeout || 30000;
+  var RETRIES = API.retryAttempts != null ? API.retryAttempts : 2;
+
+  var MSG = window.ERROR_MESSAGES || {
+    NETWORK_ERROR: 'Erreur de connexion au serveur. Verifiez votre connexion internet.',
+    SERVER_ERROR: 'Erreur serveur. Veuillez reessayer plus tard.',
+    HSM_DISCONNECTED: 'HSM deconnecte. Verifiez la connexion materielle.',
+    INVALID_CERTIFICATE: 'Certificat invalide ou corrompu.',
+    FILE_TOO_LARGE: 'Fichier trop volumineux. Taille maximale : 10 Mo.',
+    UNSUPPORTED_FILE_TYPE: 'Type de fichier non supporte.'
+  };
+
+  function toast(msg, type) {
+    if (typeof window.showToast === 'function') {
+      window.showToast(msg, type || 'info');
+    } else {
+      console[type === 'error' ? 'error' : 'log'](msg);
     }
-};
+  }
 
-// ---------- Gestionnaire de certificats ----------
-class PKICertificateManager {
-    constructor() {
-        this.baseURL = window.APP_CONFIG?.api?.base || '';
-        this.endpoints = window.APP_CONFIG?.api?.endpoints || {};
-    }
+  function withBase(path) {
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    return API_BASE + path;
+  }
 
-    // 🔄 Chargement des certificats
-    async loadCertificates(filters = {}) {
-        try {
-            this.showLoadingState();
-            
-            const params = new URLSearchParams();
-            if (filters.status && filters.status !== 'all') params.append('status', filters.status);
-            if (filters.type && filters.type !== 'all') params.append('type', filters.type);
-            if (filters.search) params.append('search', filters.search);
+  function http(url, options, cfg) {
+    options = options || {};
+    cfg = cfg || {};
+    var retries = cfg.retries != null ? cfg.retries : RETRIES;
+    var timeout = cfg.timeout != null ? cfg.timeout : TIMEOUT;
 
-            const response = await this.apiFetch(`${this.endpoints.certificates}?${params}`);
-            
-            if (response.ok) {
-                const data = await response.json();
-                appState.certificates = Array.isArray(data) ? data : [];
-                this.renderCertificatesTable(appState.certificates);
-                this.updateCertificateSelects();
-            } else {
-                 appState.certificates = [];
-                 this.renderCertificatesTable([]);
-                 this.updateCertificateSelects();
-                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error('Erreur chargement certificats:', error);
-            this.showError('Erreur lors du chargement des certificats: ' + error.message);
-            this.renderEmptyState();
-        }
-    }
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, timeout);
 
-    // 🎨 Rendu du tableau des certificats
-    renderCertificatesTable(certificates) {
-        const tbody = document.getElementById('certificatesTableBody');
-        
-        if (!certificates || certificates.length === 0) {
-            tbody.innerHTML = this.getEmptyStateHTML();
-            return;
-        }
+    var headers = Object.assign({}, options.headers || {});
+    var isFormData = (options.body && typeof FormData !== 'undefined' && options.body instanceof FormData);
+    if (!isFormData && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
 
-        // Appliquer les filtres
-        const filteredCertificates = this.filterCertificates(certificates);
-        
-        tbody.innerHTML = filteredCertificates.map(cert => `
-            <tr class="hover-row cert-status-${cert.status}">
-                <td class="p-4">
-                    <div class="font-medium text-slate-800">${this.escapeHTML(this.getSubjectCN(cert.subject))}</div>
-                    <div class="text-sm text-slate-500">S/N: ${this.escapeHTML(cert.serial || cert.serialNumber)}</div>
-                </td>
-                <td class="p-4 text-slate-600">${this.escapeHTML(this.getSubjectCN(cert.issuer))}</td>
-                <td class="p-4">
-                    <div class="text-slate-600">${this.formatDate(cert.expires)}</div>
-                    <div class="text-xs text-slate-400">${this.getDaysUntilExpiry(cert.expires)} jours restants</div>
-                </td>
-                <td class="p-4">
-                    ${this.getCertificateTypeBadge(cert.type)}
-                </td>
-                <td class="p-4">
-                    ${this.getStatusBadge(cert.status)}
-                </td>
-                <td class="p-4 text-center">
-                    <div class="flex justify-center gap-2">
-                        <button class="btn-icon text-blue-600 view-cert" data-id="${cert.id}" title="Voir les détails">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn-icon text-green-600 download-cert" data-id="${cert.id}" title="Télécharger">
-                            <i class="fas fa-download"></i>
-                        </button>
-                        ${cert.status === 'valid' ? `
-                            <button class="btn-icon text-amber-600 revoke-cert" data-id="${cert.id}" title="Révoquer">
-                                <i class="fas fa-ban"></i>
-                            </button>
-                        ` : ''}
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+    // Force no-cache for GETs
+    if (!headers['Cache-Control']) headers['Cache-Control'] = 'no-cache';
+    if (!headers['Pragma']) headers['Pragma'] = 'no-cache';
 
-        this.bindCertificateActions();
-    }
-
-    // 🆕 Génération d'un nouveau certificat
-    async generateCertificate(certificateData) {
-        try {
-            this.showProgressModal('Génération du certificat en cours...');
-            
-            const response = await this.apiFetch(this.endpoints.generateCertificate, {
-                method: 'POST',
-                body: JSON.stringify(certificateData)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Erreur lors de la génération');
-            }
-
-            const data = await response.json();
-            
-            this.hideProgressModal();
-            this.showSuccess('Certificat généré avec succès !');
-            this.loadCertificates(); // Recharger la liste
-            return data.certificate;
-        } catch (error) {
-            this.hideProgressModal();
-            this.showError('Erreur lors de la génération: ' + error.message);
-            throw error;
-        }
-    }
-
-    // 🚫 Révocation d'un certificat
-    async revokeCertificate(certificateId, reason = 'unspecified') {
-        try {
-            if (!confirm('Êtes-vous sûr de vouloir révoquer ce certificat ? Cette action est irréversible.')) {
-                return;
-            }
-
-            this.showProgressModal('Révocation du certificat...');
-            
-            const endpoint = this.endpoints.revokeCertificate.replace('{id}', certificateId);
-            const response = await this.apiFetch(endpoint, {
-                method: 'POST',
-                body: JSON.stringify({ reason })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Erreur lors de la révocation');
-            }
-
-            const data = await response.json();
-            
-            this.hideProgressModal();
-            this.showSuccess('Certificat révoqué avec succès');
-            this.loadCertificates(); // Recharger la liste
-            return data.certificate;
-        } catch (error) {
-            this.hideProgressModal();
-            this.showError('Erreur lors de la révocation: ' + error.message);
-        }
-    }
-
-    // 📥 Téléchargement d'un certificat
-    async downloadCertificate(certificateId) {
-        try {
-            this.showProgressModal('Préparation du téléchargement...');
-            
-            const response = await this.apiFetch(`${this.endpoints.certificates}/${certificateId}/download`);
-            
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            
-            const cert = appState.certificates.find(c => c.id === certificateId);
-            const fileName = cert ? `certificate-${cert.serial}.pem` : `certificate-${certificateId}.pem`;
-            
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            
-            this.hideProgressModal();
-            this.showSuccess('Certificat téléchargé avec succès');
-        } catch (error) {
-            this.hideProgressModal();
-            this.showError('Erreur lors du téléchargement: ' + error.message);
-        }
-    }
-
-    // 🔍 Filtrage des certificats
-    filterCertificates(certificates) {
-        const { certificateStatus, certificateType, searchTerm } = appState.filters;
-        
-        return certificates.filter(cert => {
-            if (certificateStatus !== 'all' && cert.status !== certificateStatus) {
-                return false;
-            }
-            if (certificateType !== 'all' && cert.type !== certificateType) {
-                return false;
-            }
-            if (searchTerm) {
-                const term = searchTerm.toLowerCase();
-                return (
-                    (cert.subject || '').toLowerCase().includes(term) ||
-                    (cert.issuer || '').toLowerCase().includes(term) ||
-                    (cert.serial || '').toLowerCase().includes(term) ||
-                    (cert.email || '').toLowerCase().includes(term)
-                );
-            }
-            return true;
-        });
-    }
-
-    // 🎯 Gestion des événements
-    bindEvents() {
-        document.getElementById('certFilterStatus')?.addEventListener('change', () => this.applyFilters());
-        document.getElementById('certFilterType')?.addEventListener('change', () => this.applyFilters());
-        document.getElementById('certSearch')?.addEventListener('input', this.debounce(() => this.applyFilters(), 300));
-        document.getElementById('btnGenerateCert')?.addEventListener('click', () => this.openCertificateGenerationModal());
-    }
-
-    bindCertificateActions() {
-        document.getElementById('certificatesTableBody').addEventListener('click', (e) => {
-            const viewBtn = e.target.closest('.view-cert');
-            const downloadBtn = e.target.closest('.download-cert');
-            const revokeBtn = e.target.closest('.revoke-cert');
-            
-            if (viewBtn) this.viewCertificateDetails(viewBtn.dataset.id);
-            if (downloadBtn) this.downloadCertificate(downloadBtn.dataset.id);
-            if (revokeBtn) this.revokeCertificate(revokeBtn.dataset.id);
-        });
-    }
-
-    applyFilters() {
-        appState.filters.certificateStatus = document.getElementById('certFilterStatus').value;
-        appState.filters.certificateType = document.getElementById('certFilterType').value;
-        appState.filters.searchTerm = document.getElementById('certSearch').value;
-        this.renderCertificatesTable(appState.certificates);
-    }
-    
-    // ⚡ Utilitaires
-    getCertificateTypeBadge(type) {
-        const config = window.CERTIFICATE_TYPES[type] || { label: type, color: 'gray' };
-        return `<span class="badge bg-${config.color}-100 text-${config.color}-800">${config.label}</span>`;
-    }
-
-    getStatusBadge(status) {
-        const config = window.CERTIFICATE_STATUS[status] || { label: status, color: 'gray', icon: 'fa-question' };
-        return `
-            <span class="badge bg-${config.color}-100 text-${config.color}-800">
-                <i class="fas ${config.icon}"></i>
-                ${config.label}
-            </span>
-        `;
-    }
-
-    getSubjectCN(subject) {
-        if (!subject || typeof subject !== 'string') return 'N/A';
-        const match = subject.match(/CN=([^,]+)/i);
-        return match ? match[1].trim() : subject.split(',')[0]?.trim() || 'N/A';
-    }
-
-    formatDate(dateString) {
-        if (!dateString || dateString === 'N/A') return '--';
-        try {
-            return new Date(dateString).toLocaleDateString('fr-FR', {
-                year: 'numeric', month: 'short', day: 'numeric'
-            });
-        } catch (error) { return '--'; }
-    }
-
-    getDaysUntilExpiry(expiryDate) {
-        if (!expiryDate) return 0;
-        try {
-            const diff = new Date(expiryDate) - new Date();
-            return Math.ceil(diff / (1000 * 60 * 60 * 24));
-        } catch (error) { return 0; }
-    }
-
-    escapeHTML(str) {
-        const p = document.createElement('p');
-        p.textContent = str;
-        return p.innerHTML;
-    }
-
-    debounce(func, wait) {
-        let timeout;
-        return (...args) => {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    }
-
-    showLoadingState() {
-        const tbody = document.getElementById('certificatesTableBody');
-        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400 loading-state"><i class="fas fa-spinner fa-spin mr-2"></i> Chargement...</td></tr>`;
-    }
-
-    renderEmptyState() {
-        const tbody = document.getElementById('certificatesTableBody');
-        if (tbody) tbody.innerHTML = this.getEmptyStateHTML();
-    }
-
-    getEmptyStateHTML() {
-        return `<tr><td colspan="6" class="text-center p-8 text-slate-400"><i class="fas fa-certificate text-4xl mb-3 opacity-50"></i><p class="font-medium">Aucun certificat trouvé</p></td></tr>`;
-    }
-
-    showError(message) {
-        this.showToast(message, 'error');
-    }
-
-    showProgressModal(message) {
-        document.getElementById('progressTitle').textContent = message;
-        document.getElementById('progressLog').innerHTML = `<div class="log-info">${new Date().toLocaleTimeString()}: ${message}</div>`;
-        document.getElementById('progressBar').style.width = '50%';
-        openModal('progressModal');
-    }
-
-    hideProgressModal() {
-        closeModal('progressModal');
-    }
-
-    showSuccess(message) {
-        this.showToast(message, 'success');
-    }
-
-    showToast(message, type = 'info') {
-        showToast(message, type);
-    }
-
-    updateCertificateSelects() {
-        const selects = [document.getElementById('certToRevoke'), document.getElementById('signingCertSelect'), document.getElementById('tsaCert')];
-        selects.forEach(select => {
-            if (select) {
-                const validCerts = appState.certificates.filter(c => c.status === 'valid');
-                select.innerHTML = '<option value="">-- Sélectionner --</option>';
-                validCerts.forEach(cert => {
-                    select.innerHTML += `<option value="${cert.id}">${this.getSubjectCN(cert.subject)} (S/N: ${cert.serial.slice(0,8)}...)</option>`;
-                });
-            }
-        });
-    }
-
-    openCertificateGenerationModal() {
-        openModal('generateCertModal');
-    }
-
-    viewCertificateDetails(certId) {
-        const cert = appState.certificates.find(c => c.id === certId);
-        if (cert) {
-            alert(`Affichage des détails pour: ${this.getSubjectCN(cert.subject)}`);
-        }
-    }
-
-    async apiFetch(endpoint, options = {}) {
-        return apiFetch(endpoint, options);
-    }
-}
-
-function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('hidden');
-    }
-}
-
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
-// ---------- Fonctions utilitaires (conservées de l'original) ----------
-
-/** Affiche une notification toast */
-function showToast(message, type = 'info', duration = 5000) {
-    let container = document.getElementById('toastContainer');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toastContainer';
-        container.className = 'toast-container';
-        document.body.appendChild(container);
-    }
-    
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.style.opacity = '0';
-    toast.innerHTML = `
-        <div class="flex items-center">
-            <i class="fas ${getToastIcon(type)} mr-2"></i>
-            <span>${message}</span>
-        </div>
-        <button class="toast-close text-white opacity-70 hover:opacity-100 ml-4">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    toast.querySelector('.toast-close').onclick = () => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
+    var final = {
+      method: options.method || 'GET',
+      headers: headers,
+      body: options.body,
+      signal: ctrl.signal,
+      cache: options.cache || 'no-store',
+      credentials: options.credentials || 'same-origin'
     };
-    
-    container.appendChild(toast);
-    
-    setTimeout(() => toast.style.opacity = '1', 10);
-    
-    setTimeout(() => {
-        if (toast.parentNode) {
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
+
+    return fetch(url, final)
+      .then(function (res) {
+        clearTimeout(timer);
+        var ct = res.headers.get('content-type') || '';
+        var isJSON = ct.indexOf('application/json') !== -1;
+        if (!isJSON) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.text();
         }
-    }, duration);
-    
-    return toast;
-}
-
-/** Retourne l'icône appropriée pour le type de toast */
-function getToastIcon(type) {
-    const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-exclamation-triangle',
-        warning: 'fa-exclamation-circle',
-        info: 'fa-info-circle'
-    };
-    return icons[type] || 'fa-info-circle';
-}
-
-/** Wrapper robuste pour les appels API */
-async function apiFetch(endpoint, options = {}) {
-    const url = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const timeout = options.timeout || 30000;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            }
+        return res.json().then(function (body) {
+          if (!res.ok) {
+            var err = new Error((body && (body.error || body.message)) || ('HTTP ' + res.status));
+            err.status = res.status;
+            err.body = body;
+            throw err;
+          }
+          return body;
         });
-        
-        clearTimeout(timeoutId);
-        
-        if (options.returnRawResponse) return response;
-        
-        if (!response.ok) {
-            let errorMessage = `Erreur HTTP ${response.status}`;
-            try {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorData.message || errorMessage;
-            } catch (e) {
-                // Ignorer si la réponse n'est pas du JSON
-            }
-            throw new Error(errorMessage);
+      })
+      .catch(function (err) {
+        clearTimeout(timer);
+        var retriable = err.name === 'AbortError' || /Failed to fetch|network.*request/i.test(err.message || '');
+        if (retriable && retries > 0) {
+          return new Promise(function (r) { setTimeout(r, 300); })
+            .then(function () { return http(url, options, { retries: retries - 1, timeout: timeout }); });
         }
-        
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return await response.json();
-        } else {
-            return await response.text();
-        }
-        
-    } catch (error) {
-        clearTimeout(timeoutId);
-        
-        if (error.name === 'AbortError') {
-            throw new Error('La requête a pris trop de temps. Veuillez réessayer.');
-        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            throw new Error(ERROR_MESSAGES.NETWORK_ERROR || 'Erreur de connexion réseau. Vérifiez votre connexion internet.');
-        } else {
-            throw error;
-        }
+        throw err;
+      });
+  }
+
+  function fmtDate(iso, style) {
+    if (!iso) return '--';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '--';
+    if (style === 'short') {
+      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
     }
-}
-
-/** Simule un délai (pour le développement) */
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// ---------- Gestion des onglets ----------
-
-function activateTab(tabId) {
-    if (appState.isLoading) return;
-    
-    // Masquer tous les contenus d'onglets
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
+    return d.toLocaleDateString('fr-FR', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
-    
-    // Afficher l'onglet sélectionné
-    const activeTab = document.getElementById(tabId);
-    if (activeTab) {
-        activeTab.classList.add('active');
-        appState.currentTab = tabId;
-    }
-    
-    // Mettre à jour la navigation
-    document.querySelectorAll('nav a').forEach(link => {
-        link.classList.remove('active-link');
-        if (link.dataset.tab === tabId) {
-            link.classList.add('active-link');
-        }
-    });
-    
-    // Mettre à jour le titre de la page
-    updatePageTitle(tabId);
-    
-    // Charger les données spécifiques à l'onglet
-    loadTabData(tabId);
-}
+  }
 
-function updatePageTitle(tabId) {
-    const titles = {
-        dashboard: 'Tableau de Bord PKI',
-        certificates: 'Gestion des Certificats',
-        signing: 'Signature et Horodatage',
-        users: 'Gestion des Utilisateurs',
-        tsa: 'Autorité d\'Horodatage',
-        crl: 'Listes de Révocation',
-        audit: 'Journal d\'Audit',
-        settings: 'Paramètres PKI'
+  function joursAvant(iso) {
+    if (!iso) return 0;
+    var e = new Date(iso).getTime();
+    var now = Date.now();
+    var diff = Math.ceil((e - now) / 86400000);
+    return diff > 0 ? diff : 0;
+  }
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = String(s == null ? '' : s);
+    return d.innerHTML;
+  }
+
+  function debounce(fn, wait) {
+    var t;
+    wait = wait || 300;
+    return function () {
+      var args = arguments;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(null, args); }, wait);
     };
-    
-    const titleElement = document.getElementById('pageTitle');
-    if (titleElement) {
-        titleElement.textContent = titles[tabId] || 'PKI Manager';
-    }
-}
+  }
 
-function loadTabData(tabId) {
-    switch (tabId) {
-        case 'dashboard':
-            loadDashboardData();
-            break;
-        case 'certificates':
-            window.certificateManager.loadCertificates();
-            break;
-        case 'signing':
-            loadSigningData();
-            break;
-        case 'users':
-            loadUsers();
-            break;
-        case 'crl':
-            loadCRLData();
-            break;
-        case 'audit':
-            loadAuditLog();
-            break;
-        case 'settings':
-            loadSettings();
-            break;
-        default:
-            break;
-    }
-}
+  // ---------------------------------
+  // App state
+  // ---------------------------------
+  var state = {
+    onglet: 'dashboard',
+    hsm: { connecte: false, carte: false, dernier: null, brut: '' },
+    certificats: [],
+    signatures: []
+  };
+  window.appState = state;
 
-// ---------- Gestion du statut HSM ----------
-
-async function checkHSMStatus() {
-    const indicators = {
-        indicator: document.getElementById('hsmStatusIndicator'),
-        text: document.getElementById('hsmStatusText'),
-        detail: document.getElementById('hsmStatusDetail'),
-        status: document.getElementById('hsmStatus'),
-        details: document.getElementById('hsmDetails')
+  // ---------------------------------
+  // HSM (PKCS#11)
+  // ---------------------------------
+  function rafraichirStatutHSM() {
+    var ind = {
+      point: document.getElementById('hsmStatusIndicator'),
+      titre: document.getElementById('hsmStatusText'),
+      detail: document.getElementById('hsmStatusDetail'),
+      bloc: document.getElementById('hsmStatus'),
+      blocDetail: document.getElementById('hsmDetails')
     };
-    
-    if (!Object.values(indicators).every(el => el)) {
-        console.warn('Éléments HSM non trouvés');
-        return;
+
+    if (ind.bloc) ind.bloc.textContent = 'Verification...';
+    if (ind.blocDetail) ind.blocDetail.textContent = 'Interrogation du HSM...';
+
+    // Try official PKI status first (if provided), then always query pkcs11 for a human detail line
+    var pkiEndpoint = PKI.hsmStatus ? withBase(PKI.hsmStatus) : null;
+    var pkcs11Endpoint = withBase(PKCS11.status || '/api/pkcs11/sc-hsm-status');
+
+    function applyFromPKI(data) {
+      var status = (data && data.status) || '';
+      var connected = !!(data.connected || data.isConnected || status === 'connected' || status === 'ok' || data.ok === true);
+      var cardPresent = !!(data.cardPresent || data.isCardPresent || data.cardStatus === 'present' || data.tokenPresent);
+      state.hsm.connecte = connected;
+      state.hsm.carte = cardPresent;
+      state.hsm.dernier = new Date().toISOString();
+      appliquerHSMUI(ind, connected, cardPresent, false);
     }
-    
-    indicators.status.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    indicators.details.textContent = 'Vérification...';
-    
-    try {
-        // Essayer différents endpoints HSM
-        const endpoints = [
-            '/api/pkcs11/status',
-            '/api/hid/status',
-            '/api/hsm/status'
-        ];
-        
-        let data = null;
-        for (const endpoint of endpoints) {
-            try {
-                const response = await fetch(endpoint, { signal: AbortSignal.timeout(5000) });
-                if (response.ok) {
-                    data = await response.json();
-                    break;
-                }
-            } catch (e) {
-                continue;
-            }
-        }
-        
-        if (!data) {
-            data = await getMockHSMStatus();
-        }
-        
-        const connected = data.connected || data.isConnected || data.status === 'connected';
-        const cardPresent = data.cardPresent || data.isCardPresent || data.cardStatus === 'present';
-        
-        appState.hsmStatus = {
-            connected,
-            cardPresent,
-            lastCheck: new Date().toISOString(),
-            deviceInfo: data.device || data.info
-        };
-        
-        if (connected && cardPresent) {
-            updateHSMIndicator(indicators, 'green', 'Connecté', 'Prêt pour les opérations', 'Actif', 'Carte détectée');
-        } else if (connected) {
-            updateHSMIndicator(indicators, 'yellow', 'En attente', 'Insérez une carte', 'En attente', 'Carte requise');
-        } else {
-            updateHSMIndicator(indicators, 'red', 'Déconnecté', 'Aucun lecteur détecté', 'Inactif', 'Vérifiez la connexion');
-        }
-        
-    } catch (error) {
-        console.error('Erreur statut HSM:', error);
-        updateHSMIndicator(indicators, 'red', 'Erreur', 'Connexion impossible', 'Erreur', 'API indisponible');
+
+    function parsePkcs11Detail(raw) {
+      // Try to extract a short human line from the sample like:
+      // "SC-HSM status OK" or "token label : SmartCard-HSM (UserPIN)"
+      if (!raw) return '';
+      var lines = String(raw).split(/\r?\n/);
+      var nice = lines.find(function (l) { return /SC-?HSM.*(OK|status)/i.test(l); }) ||
+                 lines.find(function (l) { return /token label\s*:/i.test(l); });
+      if (nice) return nice.trim();
+      // fallback to first non-empty
+      var first = lines.find(function (l) { return l.trim().length > 0; });
+      return first ? first.trim() : '';
     }
-}
 
-async function getMockHSMStatus() {
-    await delay(500);
-    
-    const statuses = ['connected', 'disconnected'];
-    const cardStatuses = ['present', 'absent'];
-    
-    const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-    const randomCardStatus = cardStatuses[Math.floor(Math.random() * cardStatuses.length)];
-    
-    return {
-        connected: randomStatus === 'connected',
-        cardPresent: randomCardStatus === 'present',
-        device: {
-            name: 'SmartCard-HSM (Simulation)',
-            manufacturer: 'CardContact',
-            version: '3.5'
-        },
-        timestamp: new Date().toISOString()
-    };
-}
-
-function updateHSMIndicator(indicators, color, text, detail, status, details) {
-    const colorClass = `bg-${color}-500`;
-    indicators.indicator.className = `w-3 h-3 rounded-full ${colorClass}`;
-    indicators.text.textContent = text;
-    indicators.detail.textContent = detail;
-    indicators.status.textContent = status;
-    indicators.details.textContent = details;
-}
-
-// ---------- Dashboard ----------
-
-async function loadDashboardData() {
-    try {
-        let data;
-        try {
-            data = await apiFetch(API_ENDPOINTS.dashboard || '/api/pki/dashboard/stats');
-        } catch (error) {
-            console.warn('API dashboard non disponible, utilisation de données mockées');
-            data = await getMockDashboardData();
-        }
-        
-        updateDashboardStats(data);
-        updateExpiringCertificates();
-        
-    } catch (error) {
-        console.error('Erreur chargement dashboard:', error);
-        updateDashboardStats(getDefaultStats());
-    }
-}
-
-async function getMockDashboardData() {
-    await delay(800);
-    
-    return {
-        activeCertificates: appState.certificates.filter(c => c.status === 'valid').length,
-        expiringSoon: appState.certificates.filter(c => {
-            const days = getDaysUntilExpiry(c.expires);
-            return c.status === 'valid' && days <= 30 && days > 0;
-        }).length,
-        signaturesThisMonth: Math.floor(Math.random() * 50) + 10,
-        signaturesToday: Math.floor(Math.random() * 5) + 1,
-        timestampsCount: Math.floor(Math.random() * 100) + 20,
-        lastUpdate: new Date().toISOString()
-    };
-}
-
-function getDefaultStats() {
-    return {
-        activeCertificates: 0,
-        expiringSoon: 0,
-        signaturesThisMonth: 0,
-        signaturesToday: 0,
-        timestampsCount: 0
-    };
-}
-
-function updateDashboardStats(stats) {
-    const elements = {
-        activeCerts: document.getElementById('activeCertsCount'),
-        certExpiry: document.getElementById('certExpiryStats'),
-        signaturesCount: document.getElementById('signaturesCount'),
-        signaturesTrend: document.getElementById('signaturesTrend'),
-        timestampsCount: document.getElementById('timestampsCount'),
-        timestampsTrend: document.getElementById('timestampsTrend')
-    };
-    
-    if (elements.activeCerts) elements.activeCerts.textContent = stats.activeCertificates || 0;
-    if (elements.certExpiry) elements.certExpiry.textContent = `${stats.expiringSoon || 0} expirent bientôt`;
-    if (elements.signaturesCount) elements.signaturesCount.textContent = stats.signaturesThisMonth || 0;
-    if (elements.signaturesTrend) elements.signaturesTrend.textContent = `${stats.signaturesToday || 0} aujourd'hui`;
-    if (elements.timestampsCount) elements.timestampsCount.textContent = stats.timestampsCount || 0;
-    if (elements.timestampsTrend) elements.timestampsTrend.textContent = `${Math.floor((stats.timestampsCount || 0) / 30)} cette semaine`;
-}
-
-function updateExpiringCertificates() {
-    const tbody = document.getElementById('expiringCertsBody');
-    if (!tbody) return;
-    
-    const expiringCerts = appState.certificates
-        .filter(cert => {
-            const days = getDaysUntilExpiry(cert.expires);
-            return cert.status === 'valid' && days <= 90 && days > 0;
+    function fetchPkcs11Detail() {
+      return http(pkcs11Endpoint, { method: 'GET' })
+        .then(function (data) {
+          var txt = (data && data.stdout) ? data.stdout : (typeof data === 'string' ? data : '');
+          state.hsm.brut = txt;
+          state.hsm.dernier = new Date().toISOString();
+          var detailLine = parsePkcs11Detail(txt);
+          if (detailLine) {
+            if (ind.detail) ind.detail.textContent = detailLine;
+            if (ind.blocDetail) ind.blocDetail.textContent = detailLine;
+          }
+          return txt;
         })
-        .sort((a, b) => new Date(a.expires) - new Date(b.expires))
-        .slice(0, 5);
-    
-    if (expiringCerts.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="3" class="text-center py-6 text-slate-500">
-                    <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                    Aucun certificat n'expire bientôt
-                </td>
-            </tr>
-        `;
-        return;
+        .catch(function () { /* silent */ });
     }
-    
-    tbody.innerHTML = expiringCerts.map(cert => {
-        const days = getDaysUntilExpiry(cert.expires);
-        return `
-            <tr class="hover:bg-slate-50">
-                <td class="p-3">${getSubjectCN(cert.subject)}</td>
-                <td class="p-3">${formatDate(cert.expires, 'short')}</td>
-                <td class="p-3 text-right font-medium ${days <= 7 ? 'text-red-600' : days <= 30 ? 'text-amber-600' : 'text-green-600'}">
-                    ${days} jours
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
 
-// ---------- Gestion des fichiers ----------
-
-function setupFileDropZone() {
-    const dropZone = document.getElementById('documentDropZone');
-    const fileInput = document.getElementById('documentInput');
-    const browseLink = document.getElementById('browseLink');
-    
-    if (!dropZone || !fileInput) return;
-    
-    dropZone.addEventListener('click', (e) => {
-        if (!e.target.closest('#browseLink')) {
-            fileInput.click();
-        }
-    });
-    
-    if (browseLink) {
-        browseLink.addEventListener('click', (e) => {
-            e.stopPropagation();
-            fileInput.click();
+    function fallBackToPkcs11() {
+      http(pkcs11Endpoint, { method: 'GET' })
+        .then(function (data) {
+          var txt = (data && data.stdout) ? data.stdout : (typeof data === 'string' ? data : '');
+          state.hsm.brut = txt;
+          state.hsm.dernier = new Date().toISOString();
+          var connecte = /SC-?HSM|Token|Serial number:/i.test(txt) || data.ok === true;
+          var carte = /token label|Card state|PIN tries remaining|DF01|present|slots:\s*\d+/i.test(txt) || connecte;
+          appliquerHSMUI(ind, connecte, carte, false);
+          var detailLine = parsePkcs11Detail(txt);
+          if (detailLine) {
+            if (ind.detail) ind.detail.textContent = detailLine;
+            if (ind.blocDetail) ind.blocDetail.textContent = detailLine;
+          }
+        })
+        .catch(function () {
+          appliquerHSMUI(ind, false, false, true);
         });
     }
-    
-    fileInput.addEventListener('change', handleFileSelect);
-    
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('border-blue-400', 'bg-blue-50');
-    });
-    
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('border-blue-400', 'bg-blue-50');
-    });
-    
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('border-blue-400', 'bg-blue-50');
-        
-        if (e.dataTransfer.files.length) {
-            handleFile(e.dataTransfer.files[0]);
+
+    if (pkiEndpoint) {
+      http(pkiEndpoint, { method: 'GET' })
+        .then(function (data) { applyFromPKI(data || {}); })
+        .catch(function () { /* fall back still runs below */ })
+        .finally(fetchPkcs11Detail);
+    } else {
+      fallBackToPkcs11();
+    }
+  }
+
+  function appliquerHSMUI(ind, connecte, carte, echec) {
+    function setPoint(cls) {
+      if (ind.point) ind.point.className = 'w-3 h-3 rounded-full ' + cls;
+    }
+    if (echec) {
+      setPoint('bg-red-500');
+      if (ind.titre) ind.titre.textContent = 'Erreur';
+      if (ind.detail) ind.detail.textContent = 'API indisponible';
+      if (ind.bloc) ind.bloc.textContent = 'Erreur';
+      if (ind.blocDetail) ind.blocDetail.textContent = 'Impossible de recuperer le statut';
+      return;
+    }
+    if (connecte && carte) {
+      setPoint('bg-green-500');
+      if (ind.titre) ind.titre.textContent = 'Connecte';
+      if (ind.detail && !ind.detail.textContent) ind.detail.textContent = 'Pret pour les operations';
+      if (ind.bloc) ind.bloc.textContent = 'Actif';
+      if (ind.blocDetail && !ind.blocDetail.textContent) ind.blocDetail.textContent = 'Carte detectee';
+    } else if (connecte) {
+      setPoint('bg-amber-500');
+      if (ind.titre) ind.titre.textContent = 'En attente';
+      if (ind.detail && !ind.detail.textContent) ind.detail.textContent = 'Inserez une carte';
+      if (ind.bloc) ind.bloc.textContent = 'En attente';
+      if (ind.blocDetail && !ind.blocDetail.textContent) ind.blocDetail.textContent = 'Carte requise';
+    } else {
+      setPoint('bg-red-500');
+      if (ind.titre) ind.titre.textContent = 'Deconnecte';
+      if (ind.detail && !ind.detail.textContent) ind.detail.textContent = 'Aucun lecteur detecte';
+      if (ind.bloc) ind.bloc.textContent = 'Inactif';
+      if (ind.blocDetail && !ind.blocDetail.textContent) ind.blocDetail.textContent = 'Verifiez la connexion';
+    }
+  }
+
+  // ---------------------------------
+  // Dashboard
+  // ---------------------------------
+  function rafraichirDashboard() {
+    var el = {
+      actifs: document.getElementById('activeCertsCount'),
+      expTxt: document.getElementById('certExpiryStats'),
+      sigCount: document.getElementById('signaturesCount'),
+      sigTrend: document.getElementById('signaturesTrend'),
+      tsCount: document.getElementById('timestampsCount'),
+      tsTrend: document.getElementById('timestampsTrend'),
+      activite: document.getElementById('recentActivity'),
+      expBody: document.getElementById('expiringCertsBody')
+    };
+
+    if (el.expBody) {
+      el.expBody.innerHTML =
+        '<tr><td colspan="3" class="text-center py-6 text-slate-400">' +
+        '<i class="fas fa-spinner spinner"></i> Chargement...' +
+        '</td></tr>';
+    }
+    if (el.activite) {
+      el.activite.innerHTML =
+        '<div class="loading-state">' +
+        '<i class="fas fa-spinner spinner"></i> Chargement des activites...' +
+        '</div>';
+    }
+
+    var endpoint = withBase(PKI.dashboardStats || PKI.dashboard || '/api/pki/dashboard/stats');
+    http(endpoint, { method: 'GET' })
+      .then(function (stats) {
+        var actifs = Number(stats.activeCertificates || 0);
+        var expirant = Number(stats.expiringSoon || 0);
+        var sigMois = Number(stats.signaturesThisMonth || 0);
+        var sigJour = Number(stats.signaturesToday || 0);
+        var ts = Number(stats.timestampsCount || 0);
+
+        if (el.actifs) el.actifs.textContent = String(actifs);
+        if (el.expTxt) el.expTxt.textContent = expirant + ' expirent bientot';
+        if (el.sigCount) el.sigCount.textContent = String(sigMois);
+        if (el.sigTrend) el.sigTrend.textContent = sigJour + ' aujourd\'hui';
+        if (el.tsCount) el.tsCount.textContent = String(ts);
+        if (el.tsTrend) el.tsTrend.textContent = Math.floor(ts / 30) + ' cette semaine';
+
+        var expList = Array.isArray(stats.expiringCertificates) ? stats.expiringCertificates : null;
+
+        function renderExp(list) {
+          if (el.expBody) {
+            if (!list || list.length === 0) {
+              el.expBody.innerHTML =
+                '<tr><td colspan="3" class="text-center py-6 text-slate-500">' +
+                '<i class="fas fa-check-circle text-green-500 mr-2"></i> Aucun certificat n\'expire bientot' +
+                '</td></tr>';
+            } else {
+              el.expBody.innerHTML = list.slice(0, 8).map(function (c) {
+                var j = joursAvant(c.expires);
+                var cls = j <= 7 ? 'text-red-600' : (j <= 30 ? 'text-amber-600' : 'text-green-600');
+                return '' +
+                  '<tr class="hover:bg-slate-50">' +
+                  '<td class="p-3">' + esc(extraireCN(c.subject)) + '</td>' +
+                  '<td class="p-3">' + fmtDate(c.expires, 'short') + '</td>' +
+                  '<td class="p-3 text-right font-medium ' + cls + '">' + j + ' jours</td>' +
+                  '</tr>';
+              }).join('');
+            }
+          }
         }
-    });
-}
 
-function handleFileSelect(e) {
-    if (e.target.files.length) {
-        handleFile(e.target.files[0]);
-    }
-}
+        if (expList) {
+          renderExp(expList);
+        } else {
+          // Fallback: derive from certificates endpoint
+          var certUrl = withBase(PKI.certificates || '/api/pki/certificates');
+          http(certUrl, { method: 'GET' })
+            .then(function (data) {
+              var all = Array.isArray(data.certificates) ? data.certificates : (Array.isArray(data) ? data : []);
+              var soon = all
+                .filter(function (c) {
+                  var t = new Date(c.expires).getTime() - Date.now();
+                  var d = Math.ceil(t / 86400000);
+                  return d > 0 && d <= 30;
+                })
+                .sort(function (a, b) { return new Date(a.expires) - new Date(b.expires); });
+              renderExp(soon);
+            })
+            .catch(function () { renderExp([]); });
+        }
 
-function handleFile(file) {
-    if (!file) return;
-    
-    const maxSize = window.APP_CONFIG?.ui?.maxFileSize || 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-        showToast(ERROR_MESSAGES.FILE_TOO_LARGE || 'Fichier trop volumineux', 'error');
-        return;
-    }
-    
-    const allowedTypes = ['.pdf', '.doc', '.docx', '.xml', '.txt', '.odt'];
-    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-    
-    if (!allowedTypes.includes(fileExtension)) {
-        showToast(ERROR_MESSAGES.UNSUPPORTED_FILE_TYPE || 'Type de fichier non supporté', 'error');
-        return;
-    }
-    
-    appState.selectedFile = file;
-    
-    const selectedDocument = document.getElementById('selectedDocument');
-    const documentName = document.getElementById('documentName');
-    const documentSize = document.getElementById('documentSize');
-    const signButton = document.getElementById('btnSignDocument');
-    
-    if (documentName) documentName.textContent = file.name;
-    if (documentSize) documentSize.textContent = formatFileSize(file.size);
-    if (selectedDocument) selectedDocument.classList.remove('hidden');
-    if (signButton) signButton.disabled = false;
-    
-    showToast(`Fichier "${file.name}" sélectionné avec succès`, 'success');
-}
-
-// ---------- Fonctions utilitaires supplémentaires ----------
-
-function getSubjectCN(subject) {
-    if (!subject || typeof subject !== 'string') return 'N/A';
-    const match = subject.match(/CN=([^,]+)/i);
-    return match ? match[1].trim() : subject.split(',')[0]?.trim() || 'N/A';
-}
-
-function formatDate(dateString, format = 'full') {
-    if (!dateString || dateString === 'N/A') return '--';
-    
-    try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return '--';
-        
-        if (format === 'short') {
-            return date.toLocaleDateString('fr-FR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
+        // Audit r�cent
+        if (el.activite) {
+          http(withBase(PKI.audit || '/api/pki/audit'), { method: 'GET' })
+            .then(function (audit) {
+              var events = Array.isArray(audit.events) ? audit.events : [];
+              if (!events.length) {
+                el.activite.innerHTML = '<div class="text-slate-500 text-sm">Aucune activite recente</div>';
+              } else {
+                el.activite.innerHTML = events.slice(0, 20).map(function (a) {
+                  var ts = a.timestamp || a.ts || a.date || new Date().toISOString();
+                  var actor = a.actor || a.user || 'Systeme';
+                  var action = a.action || a.type || '';
+                  var subject = a.subject || a.file || a.serial || '';
+                  var details = a.details ? (' - ' + esc(a.details)) : (subject ? (' - ' + esc(subject)) : '');
+                  return '' +
+                    '<div class="log-entry">' +
+                    '<span class="log-time">[' + fmtDate(ts, 'short') + ']</span>' +
+                    '<span class="log-info ml-1">' + esc(actor) + '</span>' +
+                    '<span class="ml-1">-></span>' +
+                    '<span class="ml-1">' + esc(action) + '</span>' +
+                    '<span class="ml-1 text-slate-500">' + details + '</span>' +
+                    '</div>';
+                }).join('');
+              }
+            })
+            .catch(function () {
+              el.activite.innerHTML =
+                '<div class="text-amber-600 text-sm">' +
+                '<i class="fas fa-plug mr-1"></i> Journal indisponible.' +
+                '</div>';
             });
         }
-        
-        return date.toLocaleDateString('fr-FR', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    } catch (error) {
-        console.warn('Erreur de formatage de date:', error);
-        return '--';
-    }
-}
-
-function getDaysUntilExpiry(expiryDate) {
-    if (!expiryDate) return 0;
-    
-    try {
-        const expiry = new Date(expiryDate);
-        const now = new Date();
-        const diffTime = expiry - now;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays > 0 ? diffDays : 0;
-    } catch (error) {
-        return 0;
-    }
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-// ---------- Initialisation des écouteurs d'événements ----------
-
-function setupEventListeners() {
-    // Navigation par onglets
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('nav a')) {
-            e.preventDefault();
-            const tabId = e.target.closest('a').dataset.tab;
-            if (tabId) activateTab(tabId);
+      })
+      .catch(function (e) {
+        if (e && e.status === 501) {
+          if (el.actifs) el.actifs.textContent = '0';
+          if (el.expTxt) el.expTxt.textContent = '0 expirent bientot';
+          if (el.sigCount) el.sigCount.textContent = '0';
+          if (el.sigTrend) el.sigTrend.textContent = '0 aujourd\'hui';
+          if (el.tsCount) el.tsCount.textContent = '0';
+          if (el.tsTrend) el.tsTrend.textContent = '0 cette semaine';
+          if (el.activite) {
+            el.activite.innerHTML =
+              '<div class="text-amber-600 text-sm">' +
+              '<i class="fas fa-plug mr-1"></i> Statistiques indisponibles (501). Connectez votre service PKI.' +
+              '</div>';
+          }
+          if (el.expBody) {
+            el.expBody.innerHTML =
+              '<tr><td colspan="3" class="text-center py-6 text-amber-600">' +
+              '<i class="fas fa-plug mr-1"></i> Liste des expirations indisponible (501).' +
+              '</td></tr>';
+          }
+        } else {
+          toast(MSG.SERVER_ERROR, 'error');
         }
-    });
-    
-    // Menu mobile
-    const mobileToggle = document.getElementById('mobileMenuToggle');
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    
-    if (mobileToggle && sidebar) {
-        mobileToggle.addEventListener('click', () => sidebar.classList.add('open'));
-    }
-    
-    if (sidebarToggle && sidebar) {
-        sidebarToggle.addEventListener('click', () => sidebar.classList.remove('open'));
-    }
-    
-    // Fermeture des modales
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal-overlay')) {
-            const modalId = e.target.id;
-            if(modalId) closeModal(modalId);
+      });
+  }
+
+  // ---------------------------------
+  // Certificates
+  // ---------------------------------
+  function extraireCN(subject) {
+    if (!subject || typeof subject !== 'string') return 'N/A';
+    var m = subject.match(/CN=([^,]+)/i);
+    return (m ? m[1] : subject.split(',')[0] || 'N/A').trim();
+  }
+
+  function badgeType(type) {
+    var map = window.CERTIFICATE_TYPES || {};
+    var cfg = map[type] || { label: type || '-', color: 'gray' };
+    return '<span class="badge bg-' + cfg.color + '-100 text-' + cfg.color + '-800">' +
+      esc(cfg.label) + '</span>';
+  }
+
+  function badgeStatut(st) {
+    var map = window.CERTIFICATE_STATUS || {};
+    var cfg = map[st] || { label: st || '-', color: 'gray', icon: 'fa-question' };
+    return '<span class="badge bg-' + cfg.color + '-100 text-' + cfg.color + '-800">' +
+      '<i class="fas ' + cfg.icon + '"></i> ' + esc(cfg.label) + '</span>';
+  }
+
+  function majListesCert(liste) {
+    var cibles = [
+      document.getElementById('certToRevoke'),
+      document.getElementById('signingCertSelect'),
+      document.getElementById('tsaCert')
+    ];
+    cibles.forEach(function (sel) {
+      if (!sel) return;
+      var keep = sel.value;
+      sel.innerHTML = '<option value="">-- Selectionner un certificat --</option>';
+      (liste || []).forEach(function (c) {
+        if ((c.status || '').toLowerCase() === 'valid') {
+          var o = document.createElement('option');
+          o.value = c.id;
+          o.textContent = extraireCN(c.subject) + ' (' + (c.serial || 'N/A') + ')';
+          sel.appendChild(o);
         }
+      });
+      var hasKeep = false;
+      var opts = Array.prototype.slice.call(sel.options);
+      for (var i = 0; i < opts.length; i++) {
+        if (opts[i].value === keep) { hasKeep = true; break; }
+      }
+      if (keep && hasKeep) sel.value = keep;
     });
-    
-    document.querySelectorAll('.close-modal').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const modalId = btn.getAttribute('data-modal');
-            closeModal(modalId);
-        });
+  }
+
+  function GestionCertificats() {
+    this.endpoints = {
+      list: withBase(PKI.certificates || '/api/pki/certificates'),
+      gen: withBase(PKI.generateCertificate || '/api/pki/certificates/generate'),
+      revokeBase: withBase(PKI.revokeCertificate || '/api/pki/certificates')
+    };
+    this.tbody = document.getElementById('certificatesTableBody');
+  }
+
+  GestionCertificats.prototype.loadingUI = function () {
+    if (!this.tbody) return;
+    this.tbody.innerHTML =
+      '<tr><td colspan="6" class="text-center p-6 text-slate-400">' +
+      '<i class="fas fa-spinner spinner mr-2"></i> Chargement des certificats...' +
+      '</td></tr>';
+  };
+
+  GestionCertificats.prototype.videUI = function (msg) {
+    msg = msg || 'Aucun certificat trouve';
+    if (!this.tbody) return;
+    this.tbody.innerHTML =
+      '<tr><td colspan="6" class="text-center p-8 text-slate-400">' +
+      '<i class="fas fa-certificate text-4xl mb-3 opacity-50"></i>' +
+      '<p class="font-medium">' + esc(msg) + '</p>' +
+      '<p class="text-sm mt-1">Aucun certificat ne correspond aux filtres</p>' +
+      '<button class="btn btn-primary mt-4" id="btnResetCertFilters">' +
+      '<i class="fas fa-refresh mr-2"></i> Reinitialiser les filtres</button>' +
+      '</td></tr>';
+    var btn = document.getElementById('btnResetCertFilters');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var s1 = document.getElementById('certFilterStatus');
+        var s2 = document.getElementById('certFilterType');
+        var s3 = document.getElementById('certSearch');
+        if (s1) s1.value = 'all';
+        if (s2) s2.value = 'all';
+        if (s3) s3.value = '';
+        window.certManager.recharger();
+      });
+    }
+  };
+
+  GestionCertificats.prototype.erreurUI = function (msg) {
+    if (!this.tbody) return;
+    this.tbody.innerHTML =
+      '<tr><td colspan="6" class="text-center p-6 text-red-500">' +
+      '<div class="flex flex-col items-center gap-2">' +
+      '<i class="fas fa-exclamation-triangle text-2xl"></i>' +
+      '<div class="font-semibold">' + esc(msg) + '</div>' +
+      '<button class="btn btn-secondary mt-2" id="btnRetryLoadCerts">' +
+      '<i class="fas fa-refresh mr-2"></i> Reessayer</button>' +
+      '</div></td></tr>';
+    var btn = document.getElementById('btnRetryLoadCerts');
+    if (btn) btn.addEventListener('click', function () { window.certManager.recharger(); });
+  };
+
+  GestionCertificats.prototype.filtrerLocal = function (liste) {
+    var statutEl = document.getElementById('certFilterStatus');
+    var typeEl = document.getElementById('certFilterType');
+    var searchEl = document.getElementById('certSearch');
+
+    var statut = statutEl ? statutEl.value : 'all';
+    var type = typeEl ? typeEl.value : 'all';
+    var q = searchEl ? String(searchEl.value).toLowerCase() : '';
+
+    return (liste || []).filter(function (c) {
+      if (statut !== 'all' && c.status !== statut) return false;
+      if (type !== 'all' && c.type !== type) return false;
+      if (q) {
+        var arr = [
+          (c.subject || '').toLowerCase(),
+          (c.issuer || '').toLowerCase(),
+          (c.serial || c.serialNumber || '').toLowerCase(),
+          (c.email || '').toLowerCase()
+        ];
+        var match = false;
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].indexOf(q) !== -1) { match = true; break; }
+        }
+        if (!match) return false;
+      }
+      return true;
     });
-    
-    // Rafraîchissement HSM
-    const refreshHSM = document.getElementById('refreshHSM');
-    if (refreshHSM) {
-        refreshHSM.addEventListener('click', checkHSMStatus);
-    }
-    
-    // Rafraîchissement dashboard
-    const refreshDashboard = document.getElementById('refreshDashboard');
-    if (refreshDashboard) {
-        refreshDashboard.addEventListener('click', loadDashboardData);
-    }
-    
-    // Configuration de la zone de dépôt de fichiers
-    setupFileDropZone();
+  };
 
-    // IMPLEMENTATION: Logique du formulaire de génération de certificat
-    const generateCertForm = document.getElementById('generateCertForm');
-    if (generateCertForm) {
-        generateCertForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(generateCertForm);
-            
-            const subjectParts = [];
-            if (formData.get('commonName')) subjectParts.push(`CN=${formData.get('commonName')}`);
-            if (formData.get('organization')) subjectParts.push(`O=${formData.get('organization')}`);
-            if (formData.get('orgUnit')) subjectParts.push(`OU=${formData.get('orgUnit')}`);
-            if (formData.get('locality')) subjectParts.push(`L=${formData.get('locality')}`);
-            if (formData.get('state')) subjectParts.push(`ST=${formData.get('state')}`);
-            if (formData.get('country')) subjectParts.push(`C=${formData.get('country')}`);
-            
-            const certificateData = {
-                subject: subjectParts.join(', '),
-                type: formData.get('certType'),
-                validityDays: parseInt(formData.get('validityDays'), 10),
-                keySize: parseInt(formData.get('keySize'), 10),
-                email: formData.get('email')
-            };
+  GestionCertificats.prototype.rendre = function (liste) {
+    if (!this.tbody) return;
+    if (!liste || liste.length === 0) {
+      this.videUI();
+      return;
+    }
+    this.tbody.innerHTML = liste.map(function (c) {
+      var cnSub = extraireCN(c.subject);
+      var cnIss = extraireCN(c.issuer);
+      var j = joursAvant(c.expires);
+      return '' +
+        '<tr class="hover-row cert-status-' + esc(c.status) + '">' +
+        '<td class="p-4">' +
+        '<div class="font-medium text-slate-800">' + esc(cnSub) + '</div>' +
+        '<div class="text-sm text-slate-500">S/N : ' + esc(c.serial || c.serialNumber || '') + '</div>' +
+        '</td>' +
+        '<td class="p-4 text-slate-600">' + esc(cnIss) + '</td>' +
+        '<td class="p-4">' +
+        '<div class="text-slate-600">' + fmtDate(c.expires) + '</div>' +
+        '<div class="text-xs text-slate-400">' + j + ' jours</div>' +
+        '</td>' +
+        '<td class="p-4">' + badgeType(c.type) + '</td>' +
+        '<td class="p-4">' + badgeStatut(c.status) + '</td>' +
+        '<td class="p-4 text-center">' +
+        '<div class="flex justify-center gap-2">' +
+        '<button class="btn-icon text-blue-600 view-cert" data-id="' + esc(c.id) + '" title="Voir les details">' +
+        '<i class="fas fa-eye"></i></button>' +
+        '<button class="btn-icon text-green-600 download-cert" data-id="' + esc(c.id) + '" title="Telecharger">' +
+        '<i class="fas fa-download"></i></button>' +
+        (String(c.status).toLowerCase() === 'valid'
+          ? '<button class="btn-icon text-amber-600 revoke-cert" data-id="' + esc(c.id) + '" title="Revoquer">' +
+            '<i class="fas fa-ban"></i></button>'
+          : '') +
+        '</div>' +
+        '</td>' +
+        '</tr>';
+    }).join('');
+  };
 
-            try {
-                await window.certificateManager.generateCertificate(certificateData);
-                closeModal('generateCertModal');
-                generateCertForm.reset();
-            } catch (error) {
-                console.error("Échec de la génération du certificat:", error);
-                // L'erreur est déjà affichée par le gestionnaire
+  GestionCertificats.prototype.recharger = function () {
+    this.loadingUI();
+    var self = this;
+
+    var p = new URLSearchParams();
+    var sEl = document.getElementById('certFilterStatus');
+    var tEl = document.getElementById('certFilterType');
+    var qEl = document.getElementById('certSearch');
+
+    var s = sEl ? sEl.value : '';
+    var t = tEl ? tEl.value : '';
+    var q = qEl ? qEl.value : '';
+
+    if (s && s !== 'all') p.set('status', s);
+    if (t && t !== 'all') p.set('type', t);
+    if (q) p.set('search', q);
+
+    var url = this.endpoints.list + (p.toString() ? ('?' + p) : '');
+
+    http(url, { method: 'GET' })
+      .then(function (data) {
+        var liste = Array.isArray(data.certificates) ? data.certificates : (Array.isArray(data) ? data : []);
+        state.certificats = liste;
+        self.rendre(self.filtrerLocal(liste));
+        majListesCert(liste);
+      })
+      .catch(function (e) {
+        if (e && e.status === 501) self.videUI('Service certificats indisponible (501).');
+        else self.erreurUI((e && e.message) ? e.message : MSG.SERVER_ERROR);
+      });
+  };
+
+  GestionCertificats.prototype.lierUI = function () {
+    var self = this;
+    var selStatus = document.getElementById('certFilterStatus');
+    var selType = document.getElementById('certFilterType');
+    var inputSearch = document.getElementById('certSearch');
+
+    if (selStatus) selStatus.addEventListener('change', function () { self.recharger(); });
+    if (selType) selType.addEventListener('change', function () { self.recharger(); });
+    if (inputSearch) inputSearch.addEventListener('input', debounce(function () { self.recharger(); }, 250));
+
+    document.addEventListener('click', function (e) {
+      var targetView = e.target.closest ? e.target.closest('.view-cert') : null;
+      var targetDl = e.target.closest ? e.target.closest('.download-cert') : null;
+      var targetRv = e.target.closest ? e.target.closest('.revoke-cert') : null;
+
+      if (targetView) { self.voir(targetView.getAttribute('data-id')); }
+      if (targetDl) { self.telecharger(targetDl.getAttribute('data-id')); }
+      if (targetRv) { self.revoquer(targetRv.getAttribute('data-id')); }
+    });
+  };
+
+  GestionCertificats.prototype.voir = function (id) {
+    var c = (state.certificats || []).find(function (x) { return String(x.id) === String(id); });
+    if (!c) return;
+    toast('Details du certificat : ' + extraireCN(c.subject), 'info');
+  };
+
+  GestionCertificats.prototype.telecharger = function (id) {
+    var url = this.endpoints.list + '/' + encodeURIComponent(id) + '/download';
+    fetch(url, { cache: 'no-store', credentials: 'same-origin' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      })
+      .then(function (blob) {
+        var a = document.createElement('a');
+        var cert = (state.certificats || []).find(function (c) { return String(c.id) === String(id); });
+        a.href = URL.createObjectURL(blob);
+        a.download = cert ? ('certificate-' + (cert.serial || cert.id) + '.pem') : ('certificate-' + id + '.pem');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 250);
+        toast('Certificat telecharge avec succes', 'success');
+      })
+      .catch(function (e) {
+        toast('Echec du telechargement : ' + e.message, 'error');
+      });
+  };
+
+  GestionCertificats.prototype.revoquer = function (id) {
+    var ok = window.confirm('Confirmer la revocation ? Cette action est irreversible.');
+    if (!ok) return;
+
+    var url = (PKI.revokeCertificate
+      ? withBase(PKI.revokeCertificate.replace('{id}', encodeURIComponent(id)))
+      : (this.endpoints.revokeBase + '/' + encodeURIComponent(id) + '/revoke'));
+
+    http(url, { method: 'POST', body: JSON.stringify({ reason: (document.getElementById('revocationReason')?.value || 'unspecified') }) })
+      .then(function () {
+        toast('Certificat revoque', 'success');
+        window.certManager.recharger();
+      })
+      .catch(function (e) {
+        if (e && e.status === 501) toast('Revocation indisponible (501).', 'error');
+        else toast('Revocation echouee : ' + ((e && e.message) ? e.message : 'inconnue'), 'error');
+      });
+  };
+
+  // ---------------------------------
+  // Signing (real backend)
+  // ---------------------------------
+  function initFilePicker() {
+    var input = document.getElementById('documentInput');
+    var zone = document.getElementById('documentDropZone');
+    var browse = document.getElementById('browseLink');
+    var chosen = document.getElementById('selectedDocument');
+    var nameEl = document.getElementById('documentName');
+    var sizeEl = document.getElementById('documentSize');
+    var removeBtn = document.getElementById('removeDocument');
+    var signBtn = document.getElementById('btnSignDocument');
+
+    if (!input || !zone) return;
+
+    zone.setAttribute('role', 'button');
+    zone.setAttribute('tabindex', '0');
+
+    function formatOctets(n) {
+      if (!isFinite(n)) return '0 o';
+      var u = ['o', 'Ko', 'Mo', 'Go'];
+      var i = 0;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      var digits = (n < 10 && i > 0) ? 1 : 0;
+      return n.toFixed(digits) + ' ' + u[i];
+    }
+
+    function autoriser(f) {
+      var okExt = /\.(pdf|doc|docx|xml|txt|odt)$/i.test(f.name || '');
+      var okType = /(pdf|msword|officedocument|xml|text)/i.test(f.type || '') || okExt;
+      var max = (APP.ui && APP.ui.maxFileSize) || (10 * 1024 * 1024);
+      if (!okType) { toast(MSG.UNSUPPORTED_FILE_TYPE, 'error'); return false; }
+      if (f.size > max) { toast(MSG.FILE_TOO_LARGE, 'error'); return false; }
+      return true;
+    }
+
+    function onSelected(fileList) {
+      var f = fileList && fileList[0];
+      if (!f) return;
+      if (!autoriser(f)) { input.value = ''; return; }
+      chosen?.classList.remove('hidden');
+      if (nameEl) nameEl.textContent = f.name;
+      if (sizeEl) sizeEl.textContent = formatOctets(f.size);
+      if (signBtn) signBtn.disabled = false;
+    }
+
+    browse?.addEventListener('click', function (e) { e.preventDefault(); input.click(); });
+    zone.addEventListener('click', function (e) {
+      if (e && e.target && e.target.id === 'browseLink') return;
+      input.click();
+    });
+    zone.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+    input.addEventListener('change', function () { onSelected(input.files); });
+
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      zone.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('active'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      zone.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); zone.classList.remove('active'); });
+    });
+    zone.addEventListener('drop', function (e) {
+      var files = e.dataTransfer ? e.dataTransfer.files : null;
+      if (!files || !files.length) return;
+      try { var dt = new DataTransfer(); dt.items.add(files[0]); input.files = dt.files; } catch (err) {}
+      onSelected(files);
+    });
+
+    removeBtn?.addEventListener('click', function () {
+      input.value = '';
+      chosen?.classList.add('hidden');
+      if (signBtn) signBtn.disabled = true;
+    });
+  }
+
+  function initBoutonSigner() {
+    var signBtn = document.getElementById('btnSignDocument');
+    var input = document.getElementById('documentInput');
+    var certSel = document.getElementById('signingCertSelect');
+    var pinEl = document.getElementById('signingPin');
+    var tsCb = document.getElementById('includeTimestamp');
+    var visCb = document.getElementById('visibleSignature');
+    var padesCb = document.getElementById('padesSignature');
+    var pinEye = document.getElementById('togglePinVisibility');
+
+    pinEye && pinEl && pinEye.addEventListener('click', function () {
+      pinEl.type = pinEl.type === 'password' ? 'text' : 'password';
+    });
+
+    function reeval() {
+      var hasFile = !!(input && input.files && input.files.length);
+      var hasCert = !!(certSel && certSel.value);
+      var hasPin = !!(pinEl && pinEl.value);
+      if (signBtn) signBtn.disabled = !(hasFile && hasCert && hasPin);
+    }
+    input?.addEventListener('change', reeval);
+    certSel?.addEventListener('change', reeval);
+    pinEl?.addEventListener('input', reeval);
+    reeval();
+
+    if (!signBtn) return;
+
+    var SIGN_EP = withBase(PKI.signDocument || '/api/pki/documents/sign');
+
+    signBtn.addEventListener('click', function () {
+      try {
+        var hasFile = !!(input && input.files && input.files.length);
+        var certId = (certSel && certSel.value) ? certSel.value : '';
+        var pin = (pinEl && pinEl.value) ? pinEl.value : '';
+
+        if (!hasFile) { toast('Veuillez selectionner un document a signer.', 'error'); return; }
+        if (!certId) { toast('Veuillez selectionner un certificat de signature.', 'error'); return; }
+        if (!pin) { toast('Veuillez saisir votre PIN HSM.', 'error'); return; }
+
+        var file = input.files[0];
+        var form = new FormData();
+        form.append('document', file);
+        form.append('certificateId', certId);
+        form.append('pin', pin);
+        form.append('includeTimestamp', tsCb && tsCb.checked ? 'true' : 'false');
+        form.append('visibleSignature', visCb && visCb.checked ? 'true' : 'false');
+        form.append('padesSignature', padesCb && padesCb.checked ? 'true' : 'false');
+
+        signBtn.disabled = true;
+        var html0 = signBtn.innerHTML;
+        signBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signature...';
+
+        http(SIGN_EP, { method: 'POST', body: form })
+          .then(function (dataOrText) {
+            var data = (typeof dataOrText === 'string') ? {} : (dataOrText || {});
+            if (data.ok === false) throw new Error(data.error || 'Signature echouee');
+
+            var dl = data.signature?.downloadUrl || data.downloadUrl || data.outputUrl;
+            if (dl) {
+              var link = document.createElement('a');
+              link.href = dl;
+              link.download = data.signature?.outputName || '';
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
             }
+            toast('Document signe avec succes', 'success');
+
+            document.getElementById('selectedDocument')?.classList.add('hidden');
+            input.value = '';
+            certSel && (certSel.selectedIndex = 0);
+            pinEl && (pinEl.value = '');
+            reeval();
+
+            rafraichirSignatures();
+          })
+          .catch(function (e) {
+            if (e && e.status === 501) toast('Signature non impl�ment�e c�t� serveur (501).', 'error');
+            else toast('Echec de la signature : ' + (e?.message || 'inconnue'), 'error');
+          })
+          .finally(function () {
+            signBtn.disabled = false;
+            signBtn.innerHTML = html0;
+          });
+      } catch (e) {
+        toast('Erreur de signature : ' + (e.message || 'inconnue'), 'error');
+      }
+    });
+  }
+
+  // ---------------------------------
+  // Verification (REAL backend)
+  // ---------------------------------
+  function initVerification() {
+    var input = document.getElementById('verifyDocumentInput');
+    var btn = document.getElementById('btnQuickVerify');
+    var box = document.getElementById('verificationResult');
+    var status = document.getElementById('verificationStatus');
+    var openBtn = document.getElementById('btnVerifyDocument');
+    var VERIFY_EP = withBase(PKI.verifyDocument || '/api/pki/documents/verify');
+
+    if (!input || !btn) return;
+
+    btn.disabled = true;
+    input.addEventListener('change', function () {
+      btn.disabled = !(input.files && input.files.length);
+    });
+
+    openBtn && openBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      input.click();
+    });
+
+    btn.addEventListener('click', function () {
+      if (!input.files || !input.files.length) {
+        toast('Choisissez un fichier a verifier.', 'error');
+        return;
+      }
+      var f = input.files[0];
+      var html0 = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+      var fd = new FormData();
+      fd.append('document', f);
+      fd.append('detailed', 'true');
+
+      http(VERIFY_EP, { method: 'POST', body: fd })
+        .then(function (j) {
+          var v = j.verification || {};
+          var ok = !!v.valid;
+
+          box && box.classList.remove('hidden');
+          if (ok) {
+            status.className = 'p-3 rounded-lg border border-green-300 bg-green-50';
+            var signer = v.signer || {};
+            status.innerHTML =
+              '<div class="text-green-700 font-medium"><i class="fas fa-check-circle"></i> Signature VALIDE</div>' +
+              '<div class="text-sm text-green-800 mt-2">' +
+              '<div>Signataire: ' + esc(signer.subject || '-') + '</div>' +
+              '<div>Emetteur: ' + esc(signer.issuer || '-') + '</div>' +
+              '<div>Serie: ' + esc(signer.serial || '-') + '</div>' +
+              '<div>Horodatage: ' + esc(v.timestamp || '�') + '</div>' +
+              '<div>Algorithme: ' + esc(v.algorithm || '�') + '</div>' +
+              (v.chainTrusted === false ? '<div class="mt-1 text-amber-700"> Cha�ne non ancr�e dans une AC de confiance locale</div>' : '') +
+              '</div>';
+            toast('Signature valide', 'success');
+          } else {
+            status.className = 'p-3 rounded-lg border border-red-300 bg-red-50';
+            var reason = v.reason || j.error || 'Signature invalide';
+            status.innerHTML =
+              '<div class="text-red-700 font-medium"><i class="fas fa-times-circle"></i> Signature INVALIDE</div>' +
+              '<div class="text-sm text-red-800 mt-2">' + esc(reason) + '</div>';
+            toast('Signature invalide', 'error');
+          }
+        })
+        .catch(function (e) {
+          box && box.classList.remove('hidden');
+          status.className = 'p-3 rounded-lg border border-red-300 bg-red-50';
+          if (e && e.status === 501) {
+            status.innerHTML = '<div class="text-red-700 font-medium">Verification indisponible (501)</div>';
+          } else {
+            status.innerHTML = '<div class="text-red-700 font-medium">Echec verification: ' + esc(e?.message || 'inconnue') + '</div>';
+          }
+        })
+        .finally(function () {
+          btn.disabled = !(input.files && input.files.length);
+          btn.innerHTML = html0;
         });
+    });
+  }
+
+  // ---------------------------------
+  // Signatures history
+  // ---------------------------------
+  function rafraichirSignatures() {
+    var body = document.getElementById('signaturesTableBody');
+    var ctxt = document.getElementById('signaturesCountText');
+    var endpoint = withBase((window.APP_CONFIG?.api?.pki?.signatures) || '/api/pki/signatures');
+
+    if (body) {
+      body.innerHTML =
+        '<tr><td colspan="4" class="text-center p-6 text-slate-400">' +
+        '<i class="fas fa-spinner spinner mr-2"></i> Chargement de l\'historique...' +
+        '</td></tr>';
     }
-}
 
-// ---------- Fonctions de chargement des onglets ----------
+    http(endpoint, { method: 'GET', cache: 'no-store' })
+      .then(function (data) {
+        var arr = Array.isArray(data?.signatures) ? data.signatures
+                : Array.isArray(data?.items)      ? data.items
+                : Array.isArray(data)             ? data
+                : [];
+        state.signatures = arr;
 
-async function loadSigningData() {
-    showToast('Chargement des données de signature...', 'info');
-}
+        if (ctxt) ctxt.textContent = (arr.length || 0) + ' signatures trouv�es';
+        if (!body) return;
 
-async function loadUsers() {
-    showToast('Chargement des utilisateurs...', 'info');
-}
-
-async function loadCRLData() {
-    showToast('Chargement des données CRL...', 'info');
-}
-
-async function loadAuditLog() {
-    showToast('Chargement du journal d\'audit...', 'info');
-}
-
-async function loadSettings() {
-    showToast('Chargement des paramètres...', 'info');
-}
-
-// ---------- Initialisation de l'application ----------
-
-async function initializeApplication() {
-    console.log('🚀 Initialisation de l\'application PKI...');
-    
-    try {
-        // Initialiser le gestionnaire de certificats
-        window.certificateManager = new PKICertificateManager();
-        
-        // Configurer les écouteurs d'événements
-        setupEventListeners();
-        window.certificateManager.bindEvents();
-        
-        // Vérifier le statut HSM
-        await checkHSMStatus();
-        
-        // Charger les données initiales
-        await window.certificateManager.loadCertificates(); // Charger les certificats en premier
-        await loadDashboardData();
-        
-        // Activer l'onglet par défaut
-        activateTab('dashboard');
-        
-        // Configurer le rafraîchissement automatique
-        if (window.APP_CONFIG?.ui?.autoRefresh) {
-            const interval = window.APP_CONFIG.ui.refreshInterval || 30000;
-            setInterval(() => {
-                checkHSMStatus();
-                if (appState.currentTab === 'dashboard') loadDashboardData();
-                if (appState.currentTab === 'certificates') window.certificateManager.loadCertificates();
-            }, interval);
+        if (!arr.length) {
+          body.innerHTML =
+            '<tr><td colspan="4" class="text-center p-6 text-slate-500">Aucune signature r�cente</td></tr>';
+          return;
         }
-        
-        showToast('✅ Application PKI initialisée avec succès', 'success');
-        
-    } catch (error) {
-        console.error('❌ Erreur lors de l\'initialisation:', error);
-        showToast('❌ Erreur lors du démarrage de l\'application', 'error');
+
+        body.innerHTML = arr.slice(0, 20).map(function (s) {
+          var doc = s.documentName || s.document || 'Document';
+          var ts  = s.signedAt || s.timestamp || s.ts || new Date().toISOString();
+          var ok  = (s.status === 'valid') || (s.ok === true) || (s.status === 'signed');
+          var badge = ok
+            ? '<span class="badge bg-green-100 text-green-800"><i class="fas fa-check-circle"></i> valide</span>'
+            : '<span class="badge bg-red-100 text-red-800"><i class="fas fa-times-circle"></i> invalide</span>';
+
+          var rawUrl = s.downloadUrl || s.url || s.outputUrl || '';
+          var url = rawUrl && !/^https?:\/\//i.test(rawUrl) ? (API_BASE + rawUrl) : rawUrl;
+          var btnDl = url
+            ? '<button class="btn btn-secondary btn-sm download-signature" data-url="' + esc(url) + '" title="T�l�charger"><i class="fas fa-download"></i></button>'
+            : '<button class="btn btn-secondary btn-sm" disabled title="Indisponible"><i class="fas fa-download"></i></button>';
+
+          return '' +
+            '<tr class="hover-row">' +
+            '<td class="p-3 text-ellipsis" title="'+esc(doc)+'">' + esc(doc) + '</td>' +
+            '<td class="p-3 whitespace-nowrap">' + fmtDate(ts) + '</td>' +
+            '<td class="p-3 text-center">' + badge + '</td>' +
+            '<td class="p-3 text-center">' + btnDl + '</td>' +
+            '</tr>';
+        }).join('');
+      })
+      .catch(function (e) {
+        if (body) {
+          if (e && e.status === 501) {
+            body.innerHTML =
+              '<tr><td colspan="4" class="text-center p-6 text-amber-600">' +
+              '<i class="fas fa-plug mr-1"></i> Historique indisponible (501).' +
+              '</td></tr>';
+          } else {
+            body.innerHTML =
+              '<tr><td colspan="4" class="text-center p-6 text-red-600">' +
+              esc((e && e.message) ? e.message : 'Erreur inconnue') +
+              '</td></tr>';
+          }
+        }
+        if (ctxt) ctxt.textContent = '0 signatures trouv�es';
+      });
+  }
+
+  function initControleHistorique() {
+    var btn = document.getElementById('btnRefreshSignatures') ||
+              document.querySelector('[data-action="refresh-signatures"]');
+
+    btn && btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      rafraichirSignatures();
+    });
+
+    document.addEventListener('click', function (e) {
+      var trg = e.target.closest ? e.target.closest('#btnRefreshSignatures,[data-action="refresh-signatures"]') : null;
+      if (!trg) return;
+      e.preventDefault();
+      e.stopPropagation();
+      rafraichirSignatures();
+    });
+
+    document.addEventListener('click', function (e) {
+      var dl = e.target.closest ? e.target.closest('.download-signature') : null;
+      if (!dl) return;
+      var url = dl.getAttribute('data-url');
+      if (!url) { toast('Aucun fichier a telecharger pour cette entree.', 'error'); return; }
+      window.location.href = url;
+    });
+  }
+
+  // ---------------------------------
+  // Tabs & globals
+  // ---------------------------------
+  function activerOnglet(id) {
+    var contents = document.querySelectorAll('.tab-content');
+    for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
+    var tab = document.getElementById(id);
+    if (tab) tab.classList.add('active');
+
+    var navs = document.querySelectorAll('nav a');
+    for (var j = 0; j < navs.length; j++) {
+      var a = navs[j];
+      a.classList.remove('active-link');
+      if (a.dataset && a.dataset.tab === id) a.classList.add('active-link');
     }
-}
 
-// Démarrer l'application quand le DOM est prêt
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeApplication);
-} else {
-    initializeApplication();
-}
+    state.onglet = id;
+    majTitrePage(id);
+    chargerOnglet(id);
+  }
 
+  function majTitrePage(id) {
+    var titres = {
+      dashboard: 'Tableau de bord PKI',
+      certificates: 'Gestion des certificats',
+      signing: 'Signature et horodatage',
+      users: 'Gestion des utilisateurs',
+      tsa: 'Autorite d horodatage',
+      crl: 'Listes de revocation',
+      audit: 'Journal d audit',
+      settings: 'Parametres PKI'
+    };
+    var el = document.getElementById('pageTitle');
+    if (el) el.textContent = titres[id] || 'PKI Manager';
+  }
+
+  function chargerOnglet(id) {
+    if (id === 'dashboard') rafraichirDashboard();
+    else if (id === 'certificates') { if (window.certManager) window.certManager.recharger(); }
+    else if (id === 'signing') rafraichirSignatures();
+  }
+
+  function lierGlobaux() {
+    var mobileToggle = document.getElementById('mobileMenuToggle');
+    var sidebarToggle = document.getElementById('sidebarToggle');
+    var sidebar = document.getElementById('sidebar');
+
+    if (mobileToggle && sidebar) mobileToggle.addEventListener('click', function () { sidebar.classList.add('open'); });
+    if (sidebarToggle && sidebar) sidebarToggle.addEventListener('click', function () { sidebar.classList.remove('open'); });
+
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest ? e.target.closest('nav a') : null;
+      if (!a) return;
+      e.preventDefault();
+      var id = a.dataset ? a.dataset.tab : null;
+      if (id) activerOnglet(id);
+    });
+
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      if (t && t.classList && t.classList.contains('modal-overlay')) {
+        t.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    });
+
+    var batch = document.getElementById('btnBatchSign');
+    if (batch) batch.addEventListener('click', function () { toast('Signature par lot : a venir.', 'info'); });
+
+    var btnHsm = document.getElementById('refreshHSM');
+    btnHsm && btnHsm.addEventListener('click', rafraichirStatutHSM);
+    var btnDash = document.getElementById('refreshDashboard');
+    btnDash && btnDash.addEventListener('click', rafraichirDashboard);
+  }
+
+  // ---------------------------------
+  // Init
+  // ---------------------------------
+  function init() {
+    window.certManager = new GestionCertificats();
+    window.certManager.lierUI();
+
+    lierGlobaux();
+    initFilePicker();
+    initBoutonSigner();
+    initVerification();      // <-- real verification
+    initControleHistorique();
+
+    rafraichirStatutHSM();
+    rafraichirDashboard();
+    window.certManager.recharger();
+    rafraichirSignatures();
+
+    activerOnglet('dashboard');
+
+    if (APP.ui && APP.ui.autoRefresh) {
+      var interval = APP.ui.refreshInterval || 30000;
+      setInterval(function () {
+        rafraichirStatutHSM();
+        if (state.onglet === 'dashboard') rafraichirDashboard();
+        if (state.onglet === 'certificates') { if (window.certManager) window.certManager.recharger(); }
+        if (state.onglet === 'signing') rafraichirSignatures();
+      }, interval);
+    }
+
+    toast('Application PKI initialisee', 'success');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
